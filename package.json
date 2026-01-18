@@ -1,0 +1,33 @@
+{
+  "name": "vaniy",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "coverage": "npx vitest --coverage.enabled --coverage.provider=istanbul"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/teksoftgroup/vaniy.git"
+  },
+  "keywords": [],
+  "author": "Teksoftgroup",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/teksoftgroup/vaniy/issues"
+  },
+  "homepage": "https://github.com/teksoftgroup/vaniy#readme",
+  "devDependencies": {
+    "@vitest/coverage-istanbul": "^4.0.17",
+    "jsdom": "^27.4.0",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.17"
+  }
+}

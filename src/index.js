@@ -27,6 +27,7 @@ import {
   formatByCountry,
   isValidRoutingNumber,
 } from "./utils.js";
+import { cache } from "./cache.js";
 
 export { EVT, V, DOM, HTTP };
 export { get, post, put, del, raw, upload, download, request };
@@ -41,3 +42,4 @@ export {
   formatByCountry,
   isValidRoutingNumber,
 };
+export { cache };

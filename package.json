@@ -1,13 +1,26 @@
 {
   "name": "vaniy",
-  "version": "0.0.1",
-  "description": "",
-  "main": "index.js",
+  "version": "0.1.0",
+  "description": "A lightweight, modular JavaScript utility library for common web development tasks.",
   "type": "module",
   "sideEffects": false,
+  "main": "./dist/vaniy.umd.js",
+  "module": "./dist/vaniy.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/vanity.es.js",
+      "require": "./dist/vanity.umd.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "full": "npm run build && npm run test:run",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
@@ -17,7 +30,14 @@
     "type": "git",
     "url": "git+https://github.com/teksoftgroup/vaniy.git"
   },
-  "keywords": [],
+  "keywords": [
+    "VanillaJS",
+    "vanilla",
+    "JS",
+    "Javascript",
+    "PureJS",
+    "SimpleJS"
+  ],
   "author": "Teksoftgroup",
   "license": "MIT",
   "bugs": {

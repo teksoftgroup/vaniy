@@ -1,6 +1,7 @@
 # Vaniy
 
 A lightweight, modular JavaScript utility library for common web development tasks.
+Vaniy is how we say vanilla in my language.
 
 ## Features
 
@@ -19,22 +20,22 @@ npm install vaniy
 ## Quick Start
 
 ```javascript
-import { Q, HTTP, EVT, V } from 'vaniy';
+import { Q, HTTP, EVT, V } from "vaniy";
 
 // DOM manipulation
-Q('#button').text('Click me').addClass('primary');
+Q("#button").text("Click me").addClass("primary");
 
 // HTTP requests
-const data = await HTTP.get('/api/users');
+const data = await HTTP.get("/api/users");
 
 // Event system
-EVT.sub('user:login', (user) => console.log(user));
-EVT.pub('user:login', { name: 'John' });
+EVT.sub("user:login", (user) => console.log(user));
+EVT.pub("user:login", { name: "John" });
 
 // Form validation
 const { isValid, errors } = V.run(
-  { email: ['required', 'email'] },
-  { email: 'test@example.com' }
+  { email: ["required", "email"] },
+  { email: "test@example.com" },
 );
 ```
 
@@ -45,38 +46,38 @@ const { isValid, errors } = V.run(
 Select and manipulate DOM elements with a chainable API.
 
 ```javascript
-import { Q, all, make, makeId, parseHtml, onPageLoad } from 'vaniy';
+import { Q, all, make, makeId, parseHtml, onPageLoad } from "vaniy";
 
 // Select single element
-Q('#header').text('Hello World').addClass('visible');
+Q("#header").text("Hello World").addClass("visible");
 
 // Get/set values
-Q('#input').val();
-Q('#container').html('<p>New content</p>');
+Q("#input").val();
+Q("#container").html("<p>New content</p>");
 
 // Classes
-Q('.box').addClass('active').removeClass('hidden');
+Q(".box").addClass("active").removeClass("hidden");
 
 // Styles
-Q('#element').css({ color: 'red', fontSize: '16px' });
+Q("#element").css({ color: "red", fontSize: "16px" });
 
 // Events
-Q('#button').on('click', () => console.log('Clicked!'));
+Q("#button").on("click", () => console.log("Clicked!"));
 
 // Select multiple elements
-all('.items').forEach(el => el.classList.add('loaded'));
+all(".items").forEach((el) => el.classList.add("loaded"));
 
 // Create elements
-const div = make('div');
+const div = make("div");
 
 // Generate random ID
 const id = makeId(8); // "a1b2c3d4"
 
 // Parse HTML string
-const nodes = parseHtml('<div>Content</div>');
+const nodes = parseHtml("<div>Content</div>");
 
 // DOM ready
-onPageLoad(() => console.log('DOM loaded'));
+onPageLoad(() => console.log("DOM loaded"));
 ```
 
 ### HTTP
@@ -84,56 +85,79 @@ onPageLoad(() => console.log('DOM loaded'));
 HTTP client with caching, interceptors, and progress tracking.
 
 ```javascript
-import { HTTP, get, post, upload, download } from 'vaniy';
+import { HTTP, get, post, upload, download } from "vaniy";
 
 // Configure base URL and timeout
-HTTP.base('https://api.example.com').timeout(10000);
+HTTP.base("https://api.example.com").timeout(10000);
 
 // Request interceptors
 HTTP.interceptRequest((config) => {
-  config.headers['Authorization'] = 'Bearer token';
+  config.headers["Authorization"] = "Bearer token";
   return config;
 });
 
 // Response interceptors
 HTTP.interceptResponse((response) => {
-  console.log('Response:', response);
+  console.log("Response:", response);
   return response;
 });
 
 // GET request
-const users = await HTTP.get('/users');
+const users = await HTTP.get("/users");
 
 // POST request
-await HTTP.post('/users', { name: 'John', email: 'john@example.com' });
+await HTTP.post("/users", { name: "John", email: "john@example.com" });
 
 // PUT request
-await HTTP.put('/users/1', { name: 'John Updated' });
+await HTTP.put("/users/1", { name: "John Updated" });
 
 // DELETE request
-await HTTP.delete('/users/1');
+await HTTP.delete("/users/1");
 
 // With caching
-const data = await HTTP.get('/data', {
+const data = await HTTP.get("/data", {
   cache: {
-    strategy: 'cache-first', // or 'network-first'
-    storage: 'localStorage', // or 'sessionStorage', 'memory'
-    ttl: 60000 // Time to live in ms
-  }
+    strategy: "cache-first", // or 'network-first'
+    storage: "localStorage", // or 'sessionStorage', 'memory'
+    ttl: 60000, // Time to live in ms
+  },
 });
 
+**Shorthand codes:**
+
+| Rule       | Description                     |
+| ---------- | ------------------------------- |
+| `CFL`      | cache-first + localStorage      |
+| `CFS`      | cache-first + sessionStorage    |
+| `CFM`      | cache-first + memory            |
+| `NFL`      | network-first + localStorage    |
+| `NFS`      | network-first + sessionStorage  |
+| `NFM`      | network-first + memory         |
+
+// Or with cache helper see table below for options
+const data = await HTTP.get("/data", cache("CFL 1min"));
+
+// This will default to CFL
+const data = await HTTP.get("/data", cache("1min"));
+
+// This will default to CFL 1min
+const data = await HTTP.get("/data", cache(""));
+
+// This will also default to CFL 1min
+const data = await HTTP.get("/data", cache());
+
 // File upload with progress
-await HTTP.upload('/upload', fileInput.files[0], {
+await HTTP.upload("/upload", fileInput.files[0], {
   onProgress: (sent, total, percent) => {
     console.log(`${percent}% uploaded`);
-  }
+  },
 });
 
 // File download with progress
-await HTTP.download('/files/doc.pdf', {
+await HTTP.download("/files/doc.pdf", {
   onProgress: (received, total, percent) => {
     console.log(`${percent}% downloaded`);
-  }
+  },
 });
 ```
 
@@ -142,31 +166,31 @@ await HTTP.download('/files/doc.pdf', {
 Pub/Sub event system for decoupled communication.
 
 ```javascript
-import { EVT } from 'vaniy';
+import { EVT } from "vaniy";
 
 // Subscribe to event
-EVT.sub('user:login', (user) => {
-  console.log('User logged in:', user);
+EVT.sub("user:login", (user) => {
+  console.log("User logged in:", user);
 });
 
 // Subscribe once (auto-unsubscribe after first call)
-EVT.once('init', () => {
-  console.log('Initialized');
+EVT.once("init", () => {
+  console.log("Initialized");
 });
 
 // Publish event
-EVT.pub('user:login', { id: 1, name: 'John' });
+EVT.pub("user:login", { id: 1, name: "John" });
 
 // Unsubscribe
 const handler = (data) => console.log(data);
-EVT.sub('event', handler);
-EVT.unsub('event', handler);
+EVT.sub("event", handler);
+EVT.unsub("event", handler);
 
 // Check if event has listeners
-EVT.has('user:login'); // true
+EVT.has("user:login"); // true
 
 // Clear all listeners for an event
-EVT.clear('user:login');
+EVT.clear("user:login");
 
 // Clear all listeners
 EVT.clear();
@@ -177,20 +201,20 @@ EVT.clear();
 Form validation with built-in rules.
 
 ```javascript
-import { V } from 'vaniy';
+import { V } from "vaniy";
 
 const schema = {
-  email: ['required', 'email'],
-  password: ['required', 'min:8', 'max:100'],
-  birthdate: ['required', 'date'],
-  amount: ['required', 'currency']
+  email: ["required", "email"],
+  password: ["required", "min:8", "max:100"],
+  birthdate: ["required", "date"],
+  amount: ["required", "currency"],
 };
 
 const formData = {
-  email: 'test@example.com',
-  password: 'secret123',
-  birthdate: '1990-01-15',
-  amount: '$1,234.56'
+  email: "test@example.com",
+  password: "secret123",
+  birthdate: "1990-01-15",
+  amount: "$1,234.56",
 };
 
 const { isValid, errors } = V.run(schema, formData);
@@ -203,31 +227,31 @@ if (!isValid) {
 
 **Built-in Rules:**
 
-| Rule | Description |
-|------|-------------|
+| Rule       | Description             |
+| ---------- | ----------------------- |
 | `required` | Field must not be empty |
-| `email` | Valid email format |
-| `min:n` | Minimum string length |
-| `max:n` | Maximum string length |
-| `date` | Valid YYYY-MM-DD format |
-| `currency` | Valid currency format |
+| `email`    | Valid email format      |
+| `min:n`    | Minimum string length   |
+| `max:n`    | Maximum string length   |
+| `date`     | Valid YYYY-MM-DD format |
+| `currency` | Valid currency format   |
 
 ### Form Handler
 
 Complete form handling with validation and error rendering.
 
 ```javascript
-import { useFormHandler, FormHandler, FormErrorRenderer } from 'vaniy';
+import { useFormHandler, FormHandler, FormErrorRenderer } from "vaniy";
 
 // Quick setup with useFormHandler
 const schema = {
-  email: ['required', 'email'],
-  password: ['required', 'min:8']
+  email: ["required", "email"],
+  password: ["required", "min:8"],
 };
 
-const form = useFormHandler('myFormId', schema, (formData) => {
+const form = useFormHandler("myFormId", schema, (formData) => {
   // Called on successful validation
-  console.log('Submit:', formData);
+  console.log("Submit:", formData);
 });
 
 // Manual validation
@@ -237,7 +261,7 @@ form.validate();
 form.reset();
 
 // Set custom error container
-form.setContainer('email', document.querySelector('#email-errors'));
+form.setContainer("email", document.querySelector("#email-errors"));
 
 // Cleanup
 form.destroy();
@@ -245,14 +269,14 @@ form.destroy();
 
 **Form Events:**
 
-| Event | Description |
-|-------|-------------|
-| `form:state:change` | Form data changed |
-| `form:errors:change` | Validation errors changed |
-| `form:submit:success` | Successful submission |
-| `form:submit:error` | Validation failed |
-| `form:reset` | Form was reset |
-| `form:validated` | Validation completed |
+| Event                 | Description               |
+| --------------------- | ------------------------- |
+| `form:state:change`   | Form data changed         |
+| `form:errors:change`  | Validation errors changed |
+| `form:submit:success` | Successful submission     |
+| `form:submit:error`   | Validation failed         |
+| `form:reset`          | Form was reset            |
+| `form:validated`      | Validation completed      |
 
 ### Utilities
 
@@ -266,24 +290,24 @@ import {
   redirect,
   isFocus,
   isArray,
-  isArrayEmpty
-} from 'vaniy';
+  isArrayEmpty,
+} from "vaniy";
 
 // Validate US bank routing number
-isValidRoutingNumber('021000021'); // true
+isValidRoutingNumber("021000021"); // true
 
 // Format as currency
 toCurrency(1234.56); // "$1,234.56"
-toCurrency(1234.56, { locale: 'de-DE', currency: 'EUR' }); // "1.234,56 €"
+toCurrency(1234.56, { locale: "de-DE", currency: "EUR" }); // "1.234,56 €"
 
 // Format by country code
-formatByCountry(1234.56, 'GB'); // "£1,234.56"
+formatByCountry(1234.56, "GB"); // "£1,234.56"
 
 // Redirect to URL
-redirect('/dashboard');
+redirect("/dashboard");
 
 // Check if element has focus
-isFocus(document.querySelector('#input'));
+isFocus(document.querySelector("#input"));
 
 // Array utilities
 isArray([1, 2, 3]); // true

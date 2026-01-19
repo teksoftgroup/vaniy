@@ -6,11 +6,15 @@
   "sideEffects": false,
   "main": "./dist/vaniy.umd.js",
   "module": "./dist/vaniy.es.js",
+  "unpkg": "./dist/vaniy.min.js",
+  "jsdelivr": "./dist/vaniy.min.js",
   "exports": {
     ".": {
-      "import": "./dist/vanity.es.js",
-      "require": "./dist/vanity.umd.js"
-    }
+      "import": "./dist/vaniy.es.js",
+      "require": "./dist/vaniy.umd.js"
+    },
+    "./raw": "./dist/vaniy.js",
+    "./min": "./dist/vaniy.min.js"
   },
   "files": [
     "dist",
@@ -47,6 +51,8 @@
   "devDependencies": {
     "@vitest/coverage-istanbul": "^4.0.17",
     "jsdom": "^27.4.0",
+    "rollup-plugin-esbuild": "^6.2.1",
+    "rollup-plugin-filesize": "^10.0.0",
     "vite": "^7.3.1",
     "vitest": "^4.0.17"
   }

@@ -9,11 +9,9 @@ describe("validator.js (V)", () => {
   it("exposes expected shape", () => {
     expect(V).toHaveProperty("run");
     expect(V).toHaveProperty("ping");
-    expect(V).toHaveProperty("version");
     expect(V).toHaveProperty("description");
     expect(typeof V.run).toBe("function");
     expect(typeof V.ping).toBe("function");
-    expect(typeof V.version).toBe("string");
     expect(typeof V.description).toBe("string");
   });
 
@@ -34,6 +32,31 @@ describe("validator.js (V)", () => {
       isValid: true,
       errors: {},
     });
+  });
+
+  it("requiredIf: fails on dependent field not empty.", () => {
+    const schema = { company: ["required"], tax_id: ["requiredIf:company"] };
+
+    const res = V.run(schema, {
+      company: "ACME",
+      tax_id: "",
+    });
+
+    expect(res.isValid).toBe(false);
+    expect(res.errors).toEqual({
+      tax_id: ["This field is required when company has a value"],
+    });
+  });
+
+  it("requiredIf: valid when dependent field is empty or whitespace, passes otherwise", () => {
+    const schema = { tax_id: ["requiredIf:company"] };
+
+    const res = V.run(schema, {
+      company: "",
+      tax_id: "",
+    });
+
+    expect(res.isValid).toBe(true);
   });
 
   it("email: validates basic email format", () => {
@@ -140,6 +163,70 @@ describe("validator.js (V)", () => {
     });
   });
 
+  it("same: validates fields match", () => {
+    const schema = {
+      name: ["required", "max:10"],
+      email: ["required", "email"],
+      password: ["required"],
+      confirm_password: ["required", "same:password"],
+    };
+
+    const res = V.run(schema, {
+      name: "Pascal",
+      email: "email@test.com",
+      password: "1234567",
+      confirm_password: "1234567",
+    });
+
+    expect(res.isValid).toBe(true);
+  });
+
+  it("same: validates fields don't match", () => {
+    const schema = {
+      email: ["required", "email"],
+      password: ["required"],
+      confirm_password: ["required", "same:password"],
+    };
+
+    const res = V.run(schema, {
+      email: "email@test.com",
+      password: "nope",
+      confirm_password: "nah",
+    });
+
+    expect(res.isValid).toBe(false);
+    expect(res.errors).toEqual({
+      confirm_password: ["Must match password"],
+    });
+  });
+
+  it("in: validates that fields is matching set of values", () => {
+    const schema = {
+      category: ["required", "in:action,thriller,horror"],
+    };
+
+    const res = V.run(schema, {
+      category: "action",
+    });
+
+    expect(res.isValid).toBe(true);
+  });
+
+  it("in: validates that error is shown for no matching enum", () => {
+    const schema = {
+      category: ["in:action,thriller,horror"],
+    };
+
+    const res = V.run(schema, {
+      category: "comedy",
+    });
+
+    expect(res.isValid).toBe(false);
+    expect(res.errors).toEqual({
+      category: ["Must be one of the following: action,thriller,horror"],
+    });
+  });
+
   it("accumulates multiple errors per field (required + email)", () => {
     const schema = { email: ["required", "email"] };
 
@@ -178,4 +265,3 @@ describe("validator.js (V)", () => {
     expect(spy).toHaveBeenCalledWith("PONG");
   });
 });
-

@@ -227,14 +227,17 @@ if (!isValid) {
 
 **Built-in Rules:**
 
-| Rule       | Description             |
-| ---------- | ----------------------- |
-| `required` | Field must not be empty |
-| `email`    | Valid email format      |
-| `min:n`    | Minimum string length   |
-| `max:n`    | Maximum string length   |
-| `date`     | Valid YYYY-MM-DD format |
-| `currency` | Valid currency format   |
+| Rule                   | Description                                 |
+| ---------------------- | ------------------------------------------- |
+| `required`             | Field must not be empty                     |
+| `requiredIf:condition` | Field must not be empty if condition is met |
+| `email`                | Valid email format                          |
+| `min:n`                | Minimum string length                       |
+| `max:n`                | Maximum string length                       |
+| `date`                 | Valid YYYY-MM-DD format                     |
+| `currency`             | Valid currency format                       |
+| `same:field`           | Current field must match specified field    |
+| `in:list`              | Field value must be in the list             |
 
 ### Form Handler
 

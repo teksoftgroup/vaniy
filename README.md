@@ -82,6 +82,17 @@ onPageLoad(() => console.log("DOM loaded"));
 
 ### HTTP
 
+**Caching shorthand codes:**
+
+| Rule  | Description                    |
+| ----- | ------------------------------ |
+| `CFL` | cache-first + localStorage     |
+| `CFS` | cache-first + sessionStorage   |
+| `CFM` | cache-first + memory           |
+| `NFL` | network-first + localStorage   |
+| `NFS` | network-first + sessionStorage |
+| `NFM` | network-first + memory         |
+
 HTTP client with caching, interceptors, and progress tracking.
 
 ```javascript
@@ -122,17 +133,6 @@ const data = await HTTP.get("/data", {
     ttl: 60000, // Time to live in ms
   },
 });
-
-**Shorthand codes:**
-
-| Rule       | Description                     |
-| ---------- | ------------------------------- |
-| `CFL`      | cache-first + localStorage      |
-| `CFS`      | cache-first + sessionStorage    |
-| `CFM`      | cache-first + memory            |
-| `NFL`      | network-first + localStorage    |
-| `NFS`      | network-first + sessionStorage  |
-| `NFM`      | network-first + memory         |
 
 // Or with cache helper see table below for options
 const data = await HTTP.get("/data", cache("CFL 1min"));

@@ -378,4 +378,80 @@ describe("form.js", () => {
     // destroy should not throw
     expect(() => api.destroy()).not.toThrow();
   });
+
+  it("preSubmit: runs after validation and can transform data before SUBMIT_SUCCESS + onSubmit", async () => {
+    vi.spyOn(V, "run").mockReturnValue({ isValid: true, errors: {} });
+
+    const preSubmit = vi.fn(async (data) => {
+      return { ...data, name: "Pascal (sanitized)", extra: "ok" };
+    });
+
+    const onSubmit = vi.fn();
+    const h = new FormHandler("myForm", { schema: true }, onSubmit, {
+      preSubmit,
+    });
+
+    const form = document.getElementById("myForm");
+    form.dispatchEvent(
+      new SubmitEvent("submit", { bubbles: true, cancelable: true }),
+    );
+
+    // wait a tick for async preSubmit to resolve
+    await Promise.resolve();
+
+    expect(preSubmit).toHaveBeenCalledTimes(1);
+    // expect(preSubmit).toHaveBeenCalledWith({
+    //   email: "a@b.com",
+    //   name: "Pascal (sanitized)",
+    // });
+
+    // SUBMIT_SUCCESS should include transformed payload
+    expect(pubSpy).toHaveBeenCalledWith(FormEvents.SUBMIT_SUCCESS, {
+      formId: "myForm",
+      data: { email: "a@b.com", name: "Pascal (sanitized)", extra: "ok" },
+    });
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      email: "a@b.com",
+      name: "Pascal (sanitized)",
+      extra: "ok",
+    });
+  });
+
+  it("preSubmit: if it throws, publishes SUBMIT_ERROR with _preSubmit and does not call onSubmit/SUBMIT_SUCCESS", async () => {
+    vi.spyOn(V, "run").mockReturnValue({ isValid: true, errors: {} });
+
+    const preSubmit = vi.fn(async () => {
+      throw new Error("Stripe tokenization failed");
+    });
+
+    const onSubmit = vi.fn();
+    const h = new FormHandler("myForm", { schema: true }, onSubmit, {
+      preSubmit,
+    });
+
+    const form = document.getElementById("myForm");
+    form.dispatchEvent(
+      new SubmitEvent("submit", { bubbles: true, cancelable: true }),
+    );
+
+    // wait a tick for async preSubmit to reject
+    await Promise.resolve();
+
+    expect(preSubmit).toHaveBeenCalledTimes(1);
+
+    // should publish SUBMIT_ERROR with _preSubmit
+    expect(pubSpy).toHaveBeenCalledWith(FormEvents.SUBMIT_ERROR, {
+      formId: "myForm",
+      errors: { _preSubmit: ["Stripe tokenization failed"] },
+    });
+
+    // should NOT publish SUBMIT_SUCCESS
+    expect(pubSpy).not.toHaveBeenCalledWith(
+      FormEvents.SUBMIT_SUCCESS,
+      expect.anything(),
+    );
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

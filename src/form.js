@@ -13,10 +13,11 @@ const FormEvents = {
 };
 
 class FormHandler {
-  constructor(formId, schema, onSubmit) {
+  constructor(formId, schema, onSubmit, options = {}) {
     this.formId = formId;
     this.schema = schema;
     this.onSubmit = onSubmit;
+    this.preSubmit = options.preSubmit || null;
     this.form = null;
     this.formState = {};
     this.errors = {};
@@ -67,11 +68,11 @@ class FormHandler {
     }
   }
 
-  #handleSubmit(event) {
+  async #handleSubmit(event) {
     event.preventDefault();
 
     const data = new FormData(this.form);
-    const formObject = {};
+    let formObject = {};
 
     data.forEach((value, key) => {
       formObject[key] = value;
@@ -89,17 +90,7 @@ class FormHandler {
       data: formObject,
     });
 
-    if (isValid) {
-      this.errors = {};
-      this.#publishErrors();
-
-      EVT.pub(FormEvents.SUBMIT_SUCCESS, {
-        formId: this.formId,
-        data: formObject,
-      });
-
-      this.onSubmit(formObject);
-    } else {
+    if (!isValid) {
       this.errors = validateErrors;
       this.#publishErrors();
 
@@ -107,7 +98,30 @@ class FormHandler {
         formId: this.formId,
         errors: validateErrors,
       });
+      return;
     }
+
+    this.errors = {};
+    this.#publishErrors();
+
+    if (this.preSubmit) {
+      try {
+        formObject = await this.preSubmit(formObject);
+      } catch (error) {
+        EVT.pub(FormEvents.SUBMIT_ERROR, {
+          formId: this.formId,
+          errors: { _preSubmit: [error.message] },
+        });
+        return;
+      }
+    }
+
+    EVT.pub(FormEvents.SUBMIT_SUCCESS, {
+      formId: this.formId,
+      data: formObject,
+    });
+
+    this.onSubmit(formObject);
   }
 
   #publishState() {
@@ -131,7 +145,6 @@ class FormHandler {
   getErrors() {
     return { ...this.errors };
   }
-
   reset() {
     this.formState = { ...this.initialValues };
     this.errors = {};

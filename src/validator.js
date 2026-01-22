@@ -1,5 +1,20 @@
 "use strict";
 
+import { resolveDateEpochDay } from "./date.js";
+import { parseMinMax, autoSize } from "./utils.js";
+
+function makeDateCompareRule(compare, messageBuilder) {
+  return {
+    method: (target) => (value, formData, opts) => {
+      const left = resolveDateEpochDay(value, formData, opts, "value");
+      const right = resolveDateEpochDay(target, formData, opts, "target");
+      if (left == null || right == null) return false;
+      return compare(left, right);
+    },
+    message: messageBuilder,
+  };
+}
+
 const methods = {
   required: {
     method: (value) => String(value ?? "").trim() !== "",
@@ -84,6 +99,36 @@ const methods = {
             .split(",")
             .map((s) => s.trim());
       return `Must be one of the following: ${allowed.filter(Boolean).join(",")}`;
+    },
+  },
+  before: makeDateCompareRule(
+    (left, right) => left < right,
+    (target) => `Must be before ${target}`,
+  ),
+  beforeOrEqual: makeDateCompareRule(
+    (left, right) => left <= right,
+    (target) => `Must be before or equal to ${target}`,
+  ),
+  after: makeDateCompareRule(
+    (left, right) => left > right,
+    (target) => `Must be after ${target}`,
+  ),
+  afterOrEqual: makeDateCompareRule(
+    (left, right) => left >= right,
+    (target) => `Must be after or equal to ${target}`,
+  ),
+  between: {
+    method: (param) => (value) => {
+      const range = parseMinMax(param);
+      if (!range) return false;
+
+      const size = autoSize(value);
+      return range.min <= size && size <= range.max;
+    },
+    message: (param) => {
+      const range = parseMinMax(param);
+      if (!range) return "Between rule is invalid. Use between:min,max";
+      return `Must be between ${range.min} and ${range.max}`;
     },
   },
 };

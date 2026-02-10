@@ -28,6 +28,7 @@ import {
   isValidRoutingNumber,
 } from "./utils.js";
 import { cache } from "./cache.js";
+import { queryClient, bindQuery } from "./query.js";
 
 export { EVT, V, DOM, HTTP };
 export { get, post, put, del, raw, upload, download, request };
@@ -43,3 +44,4 @@ export {
   isValidRoutingNumber,
 };
 export { cache };
+export { queryClient, bindQuery };

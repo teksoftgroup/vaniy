@@ -22,8 +22,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "build:prod": "vite build --mode production",
+    "build": "npm run build:prod",
     "full": "npm run build && npm run test:run",
     "preview": "vite preview",
     "test": "vitest",
@@ -49,6 +50,7 @@
   },
   "homepage": "https://github.com/teksoftgroup/vaniy#readme",
   "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
     "@vitest/coverage-istanbul": "^4.0.17",
     "jsdom": "^27.4.0",
     "rollup-plugin-esbuild": "^6.2.1",

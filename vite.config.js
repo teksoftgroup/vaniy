@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import fs from "node:fs";
 import path from "node:path";
 import esbuild from "rollup-plugin-esbuild";
+import terser from "@rollup/plugin-terser";
 import filesize from "rollup-plugin-filesize";
 
 const pkg = JSON.parse(
@@ -16,71 +17,67 @@ const banner = `/*!
  * Released under the ${pkg.license ?? "MIT"} License
  */`;
 
-const minifyPlugin = () => {
-  esbuild({
-    minify: true,
-    target: "es2018",
+export default defineConfig(({ mode }) => {
+  const isProd = mode === "production";
+
+  const terserPlugin = terser({
+    format: {
+      comments: /^!/,
+    },
+    compress: true,
+    mangle: true,
   });
-};
 
-export default defineConfig({
-  test: {
-    environment: "jsdom",
-  },
-
-  build: {
-    lib: {
-      entry: "src/index.js",
-      name: "vaniy",
+  return {
+    test: {
+      environment: "jsdom",
     },
+    build: {
+      lib: {
+        entry: "src/index.js",
+        name: "vaniy",
+      },
 
-    minify: false,
-    sourcemap: true,
-
-    rollupOptions: {
-      output: [
-        {
-          format: "es",
-          entryFileNames: "vaniy.es.js",
-          exports: "named",
-          banner,
-        },
-        {
-          format: "umd",
-          name: "vaniy",
-          entryFileNames: "vaniy.umd.js",
-          exports: "named",
-          banner,
-        },
-        {
-          format: "umd",
-          name: "vaniy",
-          entryFileNames: "vaniy.min.js",
-          exports: "named",
-          banner,
-          plugins: [minifyPlugin()],
-        },
-        {
-          format: "iife",
-          name: "vaniy",
-          entryFileNames: "vaniy.js",
-          banner,
-        },
-        {
-          format: "iife",
-          name: "vaniy",
-          entryFileNames: "vaniy.min.js",
-          banner,
-          plugins: [minifyPlugin()],
-        },
-      ],
-      plugins: [
-        filesize({
-          showMinifiedSize: false,
-          showGzippedSize: true,
-          showBrotliSize: true,
-        }),
-      ],
+      minify: false,
+      rollupOptions: {
+        output: [
+          {
+            format: "es",
+            entryFileNames: "vaniy.es.js",
+            exports: "named",
+            banner,
+            sourcemap: !isProd,
+          },
+          {
+            format: "umd",
+            name: "vaniy",
+            entryFileNames: isProd ? "vaniy.umd.min.js" : "vaniy.umd.js",
+            exports: "named",
+            banner,
+            sourcemap: !isProd,
+            plugins: isProd ? [terser()] : [],
+          },
+          {
+            format: "iife",
+            name: "vaniy",
+            entryFileNames: isProd ? "vaniy.iife.min.js" : "vaniy.iife.js",
+            banner,
+            plugins: isProd ? [terser()] : [],
+            sourcemap: !isProd,
+          },
+        ],
+        plugins: [
+          ...(isProd
+            ? [
+                filesize({
+                  showMinifiedSize: false,
+                  showGzippedSize: true,
+                  showBrotliSize: true,
+                }),
+              ]
+            : []),
+        ],
+      },
     },
-  },
+  };
 });

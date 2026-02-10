@@ -51,7 +51,7 @@ export default defineConfig(({ mode }) => {
           {
             format: "umd",
             name: "vaniy",
-            entryFileNames: isProd ? "vaniy.umd.min.js" : "vaniy.umd.js",
+            entryFileNames: isProd ? "vaniy.min.js" : "vaniy.js",
             exports: "named",
             banner,
             sourcemap: !isProd,

@@ -4,14 +4,14 @@
   "description": "A lightweight, modular JavaScript utility library for common web development tasks.",
   "type": "module",
   "sideEffects": false,
-  "main": "./dist/vaniy.umd.js",
+  "main": "./dist/vaniy.js",
   "module": "./dist/vaniy.es.js",
   "unpkg": "./dist/vaniy.min.js",
   "jsdelivr": "./dist/vaniy.min.js",
   "exports": {
     ".": {
       "import": "./dist/vaniy.es.js",
-      "require": "./dist/vaniy.umd.js"
+      "require": "./dist/vaniy.js"
     },
     "./raw": "./dist/vaniy.js",
     "./min": "./dist/vaniy.min.js"

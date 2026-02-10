@@ -75,7 +75,20 @@ export const Q = (input) => {
       }
       return html(selectedElement);
     },
-    val: safe(() => {
+    val: safe((newVal) => {
+      if (newVal != null) {
+        if (selectedElement.opt && selectedElement.multiple) {
+          const wanted = new Set(Array.isArray(newVal) ? newVal : [newVal]);
+          Array.from(selectedElement.options).forEach((opt) => {
+            opt.selected = wanted.has(opt.value);
+          });
+        } else {
+          selectedElement.value = newVal;
+        }
+        wrapper.value = selectedElement.value;
+        return wrapper;
+      }
+
       if (selectedElement.options && selectedElement.multiple) {
         return Array.from(selectedElement.options)
           .filter((opt) => opt.selected)

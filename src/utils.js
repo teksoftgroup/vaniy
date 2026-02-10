@@ -1,10 +1,8 @@
 "use strict";
 
 export const redirect = (url) => (window.location.href = url);
-
 export const isArray = (arr) => Array.isArray(arr);
 export const isArrayEmpty = (arr) => !(Array.isArray(arr) && arr.length > 0);
-
 export const isFocus = (element) => element == document.activeElement;
 
 const currencyMap = {
@@ -75,9 +73,55 @@ export function parseMinMax(param) {
   return { min, max };
 }
 
+// is v null or undefined OR is v string empty
 export function isBlank(v) {
   return v == null || String(v ?? "").trim() === "";
 }
 
+export function fromCamelToKebabCase(camel) {
+  return camel.replace(/[A-Z]/g, (char) => "-" + char.toLowerCase());
+}
 
+export function observe(obj, onChange) {
+  return new Proxy(obj, {
+    set(target, key, value) {
+      Reflect.set(target, key, value);
+      onChange({ key, value });
+    },
+  });
+}
 
+export const deepClone = (target) => structuredClone(target);
+
+export const curry = (fn) => {
+  return function curried(...args) {
+    if (args.length >= fn.length) {
+      return fn.apply(this, args);
+    }
+    return (...next) => curried(...args, ...next);
+  };
+};
+
+export const chainAsync = (acc, val) => acc.then(val);
+
+export const sequenceAsync =
+  (...fns) =>
+  (fn) =>
+    fns.reduce(chainAsync, Promise.resolve(fn));
+
+export const tryCatch = (promise) =>
+  promise.then((data) => [null, data]).catch((err) => [err, null]);
+
+export async function flow(initial, ...fns) {
+  let val = initial;
+
+  for (const fn of fns) {
+    const [err, res] = await tryCatch(typeof fn === "function" ? fn(val) : fn);
+    if (err) return [err, null];
+    val = res;
+  }
+
+  return [null, val];
+}
+
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

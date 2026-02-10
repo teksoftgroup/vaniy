@@ -7,7 +7,7 @@ describe("evt.js (EVT)", () => {
     EVT.clear();
   });
 
-  it("exports expected shape", () => {
+  it("exports expected shape", () => {    
     expect(EVT).toHaveProperty("listeners");
     expect(EVT).toHaveProperty("sub");
     expect(EVT).toHaveProperty("once");

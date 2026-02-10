@@ -35,9 +35,10 @@ function makeFetchResponse({
 
 describe("http.js", () => {
   beforeEach(() => {
+    
     // reset module config
     HTTP.base("").timeout(8000).interceptRequest(null).interceptResponse(null);
-
+    
     // mock fetch + timers
     vi.useFakeTimers();
     global.fetch = vi.fn();

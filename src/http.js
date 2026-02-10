@@ -1,5 +1,30 @@
 "use strict";
 
+/**
+ * Lightweight HTTP utility with:
+ * - base URL support
+ * - request + response interceptors
+ * - timeouts (AbortController for fetch, XHR timeout for uploads)
+ * - caching (memory/localStorage/sessionStorage) with TTL
+ * - download helper (stream + progress)
+ * - upload helper (XHR + progress)
+ *
+ * Default export: HTTP (chainable config object)
+ *
+ * Example:
+ *   import HTTP from "./http.js";
+ *
+ *   HTTP
+ *     .base("https://api.example.com")
+ *     .timeout(10000)
+ *     .interceptRequest((cfg) => {
+ *       cfg.headers = { ...cfg.headers, Authorization: "Bearer token" };
+ *       return cfg;
+ *     });
+ *
+ *   const user = await HTTP.get("/me");
+ */
+
 let _base = "";
 let _timeout = 8000;
 let _requestInterceptor = null;
@@ -110,6 +135,32 @@ function buildFormData({ files, fieldName = "file", fields = {} }) {
 const applyTimeout = (ms, controller) =>
   setTimeout(() => controller.abort(), ms);
 
+/**
+ * Core request function used by get/post/put/delete.
+ *
+ * - Uses fetch() with AbortController timeout
+ * - Auto JSON parses if possible; otherwise returns text
+ * - Supports caching (memory/local/session) with TTL and strategies
+ *
+ * @template T
+ * @param {"GET"|"POST"|"PUT"|"DELETE"|string} method
+ * @param {string} url Relative URL (prefixed by base())
+ * @param {RequestOptions} [opts]
+ * @returns {Promise<T>}
+ * @throws {HttpError} if response is not ok
+ *
+ * @example
+ * const data = await request("GET", "/users", {
+ *   params: { page: 1 },
+ *   cache: { strategy: "cache-first", ttl: 60_000, storage: "memory" }
+ * });
+ *
+ * @example
+ * // network-first with cache fallback
+ * const data = await request("GET", "/settings", {
+ *   cache: { strategy: "network-first", ttl: 5 * 60_000, storage: "local" }
+ * });
+ */
 export async function request(method, url, opts = {}) {
   const { params, body, headers = {}, cache } = opts;
 
@@ -198,6 +249,30 @@ export async function request(method, url, opts = {}) {
   }
 }
 
+/**
+ * Download a file and trigger a browser download prompt.
+ * Uses fetch() and can stream progress when ReadableStream is available.
+ *
+ * @param {string} url
+ * @param {Object} [options]
+ * @param {string} [options.filename]
+ *   Optional filename override. If omitted, inferred from Content-Disposition.
+ * @param {Object<string,string|number|boolean>} [options.params]
+ * @param {Object<string,string>} [options.headers]
+ * @param {"GET"|"POST"|"PUT"|"DELETE"|string} [options.method="GET"]
+ * @param {any} [options.body]
+ * @param {(receivedBytes:number, totalBytes:number|null, percent:number|null)=>void} [options.onProgress]
+ *
+ * @returns {Promise<{filename:string, size:number, type:string}>}
+ *
+ * @example
+ * await download("/reports/monthly", {
+ *   params: { month: "2026-01" },
+ *   onProgress: (received, total, percent) => {
+ *     console.log("download", { received, total, percent });
+ *   }
+ * });
+ */
 export async function download(
   url,
   { filename, params, headers = {}, method = "GET", body, onProgress } = {},
@@ -287,6 +362,32 @@ export async function download(
   return { filename, size: blob.size, type: blob.type };
 }
 
+/**
+ * Upload one or more files with progress using XMLHttpRequest.
+ * (XHR is used because fetch upload progress is not consistently available.)
+ *
+ * @param {string} url
+ * @param {Object} [options]
+ * @param {File|Blob|Array<File|Blob>} options.files
+ * @param {string} [options.fieldName="file"]
+ * @param {Object<string, any>} [options.fields={}]
+ * @param {Object<string,string>} [options.headers={}]
+ *   Extra headers (do NOT set Content-Type for FormData yourself)
+ * @param {"POST"|"PUT"|string} [options.method="POST"]
+ * @param {(sentBytes:number, totalBytes:number|null, percent:number|null)=>void} [options.onProgress]
+ * @param {AbortSignal} [options.signal]
+ *
+ * @returns {Promise<any>}
+ *
+ * @example
+ * const ac = new AbortController();
+ * const result = await upload("/upload", {
+ *   files: fileInput.files[0],
+ *   fields: { userId: 123 },
+ *   onProgress: (sent, total, percent) => console.log({ sent, total, percent }),
+ *   signal: ac.signal
+ * });
+ */
 export function upload(
   url,
   {
@@ -404,6 +505,13 @@ export function upload(
   }
 }
 
+/**
+ * Convenience methods:
+ * - get(url, opts)
+ * - post(url, body, opts)
+ * - put(url, body, opts)
+ * - delete(url, opts)
+ */
 export const get = (url, opts) => request("GET", url, opts);
 export const post = (url, body, opts = {}) =>
   request("POST", url, { ...opts, body });
@@ -413,18 +521,49 @@ export const del = (url, opts = {}) => request("DELETE", url, opts);
 export const raw = (url, opts) => fetch(_base + url, opts);
 
 const HTTP = {
+  /**
+   * Set base URL prefix for all requests.
+   * @param {string} url
+   * @returns {typeof HTTP}
+   */
   base(url) {
     _base = url;
     return HTTP;
   },
+  /**
+   * Set default timeout for requests (ms).
+   * - fetch requests abort via AbortController
+   * - XHR uploads use xhr.timeout
+   * @param {number} ms
+   * @returns {typeof HTTP}
+   */
   timeout(ms) {
     _timeout = ms;
     return HTTP;
   },
+  /**
+   * Request interceptor hook.
+   * Useful for auth headers, correlation IDs, etc.
+   * @param {RequestInterceptor} fn
+   * @returns {typeof HTTP}
+   *
+   * @example
+   * HTTP.interceptRequest((cfg) => {
+   *   cfg.headers = { ...cfg.headers, Authorization: `Bearer ${token}` };
+   *   return cfg;
+   * });
+   */
   interceptRequest(fn) {
     _requestInterceptor = fn;
     return HTTP;
   },
+  /**
+   * Response interceptor hook.
+   * Useful for logging, auto-logout on 401, etc.
+   * @param {ResponseInterceptor} fn
+   * @returns {typeof HTTP}
+   */
+
   interceptResponse(fn) {
     _responseInterceptor = fn;
     return HTTP;

@@ -3,6 +3,10 @@
 import EVT from "./evt.js";
 import V from "./validator.js";
 
+/**
+ * Form lifecycle events publish through our EVET pub/sub
+ * Consumers can subscribe using EVT.sub(event, callback)
+ */
 const FormEvents = {
   STATE_CHANGE: "form:state:change",
   ERRORS_CHANGE: "form:errors:change",
@@ -12,7 +16,35 @@ const FormEvents = {
   VALIDATED: "form:validated",
 };
 
+/**
+ * @typedef {Object} FormHandlerOptions
+ * @property {(data:Object)=>Promise<Object>|Object} [preSubmit]
+ *  Optional hook to mutate/transform data before final submit.
+ *
+ * @property {string} [containerClass]
+ *  CSS class for error containers.
+ *
+ * @property {string} [errorClass]
+ *  CSS class applied to error text.
+ *
+ * @property {boolean} [insertAfterField]
+ *  If true, errors appear after input fields.
+ */
+
+/**
+ * Handles:
+ * - form state tracking
+ * - validation
+ * - submission
+ * - event publishing
+ */
 class FormHandler {
+  /**
+   * @param {string} formId form element id string
+   * @param {Object} schema Validation schema for validator.js
+   * @param {(data:Object)=>void} onSubmit Callback when valid
+   * @param {FormHandlerOptions} [options]
+   */
   constructor(formId, schema, onSubmit, options = {}) {
     this.formId = formId;
     this.schema = schema;
@@ -29,6 +61,7 @@ class FormHandler {
     this.#init();
   }
 
+  // Initialize listeners and capture initial state.
   #init() {
     this.form = document.getElementById(this.formId);
 
@@ -44,6 +77,7 @@ class FormHandler {
     this.#publishState();
   }
 
+  // Setup initial values of the form.
   #captureInitialValues() {
     const formElements = this.form.elements;
 
@@ -55,6 +89,7 @@ class FormHandler {
     }
   }
 
+  // Handle every input as they happen in here
   #handleInput(event) {
     const { name, value } = event.target;
     if (!name) return;
@@ -68,6 +103,7 @@ class FormHandler {
     }
   }
 
+  // Handle the form submission.
   async #handleSubmit(event) {
     event.preventDefault();
 
@@ -138,13 +174,17 @@ class FormHandler {
     });
   }
 
+  /** @returns {Object} Copy of form state */
   getFormState() {
     return { ...this.formState };
   }
 
+  /** @returns {Object} Copy of current errors */
   getErrors() {
     return { ...this.errors };
   }
+
+  // Reset form to initial values.
   reset() {
     this.formState = { ...this.initialValues };
     this.errors = {};
@@ -159,6 +199,7 @@ class FormHandler {
     EVT.pub(FormEvents.RESET, { formId: this.formId });
   }
 
+  // Manually trigger validation
   validateNow() {
     const data = new FormData(this.form);
     const formObject = {};
@@ -181,6 +222,7 @@ class FormHandler {
     return result;
   }
 
+  // Destroy listeners
   destroy() {
     if (this.form) {
       this.form.removeEventListener("submit", this._boundHandleSubmit);
@@ -189,7 +231,14 @@ class FormHandler {
   }
 }
 
+/**
+ * Automatically renders validation errors in the DOM.
+ */
 class FormErrorRenderer {
+  /**
+   * @param {string} formId form element id string
+   * @param {FormHandlerOptions} [options]
+   */
   constructor(formId, options = {}) {
     this.formId = formId;
     this.options = {
@@ -212,6 +261,11 @@ class FormErrorRenderer {
     this.renderAll(errors);
   }
 
+  /**
+   * Set custom error container
+   * @param {string} fieldName name of the field within the formo
+   * @param {HTMLElement|string} container value to set the custom container with
+   */
   setContainer(fieldName, container) {
     this.customContainers[fieldName] =
       typeof container === "string"
@@ -279,9 +333,25 @@ class FormErrorRenderer {
 
 export { FormEvents, FormHandler, FormErrorRenderer };
 
-export function useFormHandler(formId, schema, onSubmit) {
-  const h = new FormHandler(formId, schema, onSubmit);
-  const r = new FormErrorRenderer(formId);
+/**
+ * High-level helper to attach validation + error rendering.
+ *
+ * @param {string} formId form element id string
+ * @param {Object} schema schema rule for
+ * @param {(data:Object)=>void} onSubmit function to execute when submit button is clicked
+ * @param {FormHandlerOptions} [options] extra options including a presubmit
+ * if you have any external api call to make before submitting that's where it would happen
+ *
+ * @example
+ * const form = useFormHandler("loginForm", schema, data => {
+ *   console.log("submit", data);
+ * }, {
+ *   preSubmit: async (d) => ({ ...d, token: "123" })
+ * });
+ */
+export function useFormHandler(formId, schema, onSubmit, options) {
+  const h = new FormHandler(formId, schema, onSubmit, options);
+  const r = new FormErrorRenderer(formId, options);
   return {
     reset: () => h.reset(),
     validate: () => h.validateNow(),

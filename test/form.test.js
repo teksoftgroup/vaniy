@@ -66,7 +66,6 @@ describe("form.js", () => {
   it("FormHandler logs an error if form not found and does not throw", () => {
     document.body.innerHTML = `<div>No form</div>`;
     const onSubmit = vi.fn();
-
     expect(() => new FormHandler("missingForm", {}, onSubmit)).not.toThrow();
     expect(console.error).toHaveBeenCalled();
   });

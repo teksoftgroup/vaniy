@@ -1,6 +1,6 @@
 {
   "name": "vaniy",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "A lightweight, modular JavaScript utility library for common web development tasks.",
   "type": "module",
   "sideEffects": false,

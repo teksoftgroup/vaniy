@@ -1,3 +1,5 @@
+"use strict";
+
 import { isBlank } from "./utils.js";
 
 function parseByFormat(value, fmt) {

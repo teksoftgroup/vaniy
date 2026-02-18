@@ -1,3 +1,5 @@
+"use strict";
+
 export function cache(input) {
   if (input == null) {
     return {

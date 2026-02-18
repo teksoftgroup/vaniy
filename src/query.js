@@ -1,5 +1,6 @@
 import EVT from "./evt.js";
 import { sleep } from "./utils.js";
+import { signal } from "./reactive.js";
 
 export const createQuery = (options = {}) => {
   const {
@@ -327,6 +328,52 @@ export const queryClient = createQuery({
   persistKey: "teksoft-cache",
   persistedKeys: ["user", "settings"],
 });
+
+export const querySignal = (key, fetcher, options = {}) => {
+  const data = signal(options.inital ?? null);
+  const loading = signal(false);
+  const error = signal(null);
+
+  const unsubscribe = queryClient.subscribe(key, (entry) => {
+    if (entry?.data) data.val = entry.data;
+    if (entry?.error) error.val = entry.error;
+    loading.val = !!entry?.promise && !entry?.data;
+  });
+
+  const fetch = () => {
+    loading.val = true;
+    return queryClient.query(key, fetcher, options);
+  };
+
+  const mutate = (updater) => {
+    const prev = queryClient.mutate(key, updater);
+    data.val = queryClient.getEntry(key)?.data;
+    return prev;
+  };
+
+  const refetch = () => {
+    queryClient.invalidate(key);
+    return fetch();
+  };
+
+  if (options.enabled !== false) fetch();
+
+  return {
+    data,
+    loading,
+    error,
+    fetch,
+    refetch,
+    unsubscribe,
+    mutate,
+  };
+};
+
+export const pollingSignal = (key, fetcher, interval, options = {}) => {
+  const qs = querySignal(key, fetcher, { ...options, enabled: false });
+  const stop = queryClient.startPolling(key, fetcher, interval, options);
+  return { ...qs, stop };
+};
 
 export const bindQuery = (key, fetcher, options = {}) => {
   const {

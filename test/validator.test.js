@@ -1,9 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// Mock resolveDateEpochDay so date comparison rules can be tested without
+// needing real opts (timezone) to be passed through V.run
+vi.mock("../src/date.js", () => ({
+  resolveDateEpochDay: vi.fn(),
+}));
+
 import V from "../src/validator.js";
+import { resolveDateEpochDay } from "../src/date.js";
 
 describe("validator.js (V)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    resolveDateEpochDay.mockReset();
   });
 
   it("exposes expected shape", () => {
@@ -263,5 +272,122 @@ describe("validator.js (V)", () => {
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
     V.ping();
     expect(spy).toHaveBeenCalledWith("PONG");
+  });
+
+  it("unknown rule is silently skipped and does not affect other rules", () => {
+    const schema = { name: ["unknownRule:abc", "required"] };
+    const res = V.run(schema, { name: "" });
+    // unknownRule is skipped; required fails
+    expect(res.isValid).toBe(false);
+    expect(res.errors.name).toEqual(["This field is required"]);
+  });
+
+  it("requiredIf with field=value syntax: fails when condition is met", () => {
+    const schema = { tax_id: ["requiredIf:type=company"] };
+
+    const fail = V.run(schema, { type: "company", tax_id: "" });
+    expect(fail.isValid).toBe(false);
+    // Note: "requied" is the spelling in the source message
+    expect(fail.errors.tax_id).toEqual([
+      "This field is requied when type is company",
+    ]);
+  });
+
+  it("requiredIf with field=value syntax: passes when condition is not met", () => {
+    const schema = { tax_id: ["requiredIf:type=company"] };
+
+    const pass = V.run(schema, { type: "individual", tax_id: "" });
+    expect(pass.isValid).toBe(true);
+  });
+
+  describe("between rule", () => {
+    it("passes when value size is within the range", () => {
+      const schema = { tags: ["between:1,5"] };
+      // autoSize([1,2,3]) = 3, which is within [1,5]
+      const res = V.run(schema, { tags: [1, 2, 3] });
+      expect(res.isValid).toBe(true);
+    });
+
+    it("fails and reports correct message when value is outside the range", () => {
+      const schema = { tags: ["between:1,5"] };
+      const res = V.run(schema, { tags: [1, 2, 3, 4, 5, 6] });
+      expect(res.isValid).toBe(false);
+      expect(res.errors.tags).toEqual(["Must be between 1 and 5"]);
+    });
+
+    it("fails with an informative message when the param is invalid", () => {
+      const schema = { x: ["between:notvalid"] };
+      const res = V.run(schema, { x: null });
+      expect(res.isValid).toBe(false);
+      expect(res.errors.x).toEqual([
+        "Between rule is invalid. Use between:min,max",
+      ]);
+    });
+  });
+
+  describe("date comparison rules (before / after / beforeOrEqual / afterOrEqual)", () => {
+    it("before: valid when value epoch is less than target epoch", () => {
+      resolveDateEpochDay
+        .mockReturnValueOnce(1000) // value side
+        .mockReturnValueOnce(2000); // target side
+
+      const res = V.run({ dob: ["before:2030-01-01"] }, { dob: "2025-01-01" });
+      expect(res.isValid).toBe(true);
+    });
+
+    it("before: invalid when value epoch is greater than target epoch", () => {
+      resolveDateEpochDay
+        .mockReturnValueOnce(3000)
+        .mockReturnValueOnce(2000);
+
+      const res = V.run({ dob: ["before:2020-01-01"] }, { dob: "2025-01-01" });
+      expect(res.isValid).toBe(false);
+      expect(res.errors.dob).toEqual(["Must be before 2020-01-01"]);
+    });
+
+    it("beforeOrEqual: valid when value epoch equals target epoch", () => {
+      resolveDateEpochDay
+        .mockReturnValueOnce(2000)
+        .mockReturnValueOnce(2000);
+
+      const res = V.run(
+        { dob: ["beforeOrEqual:2025-01-01"] },
+        { dob: "2025-01-01" },
+      );
+      expect(res.isValid).toBe(true);
+    });
+
+    it("after: valid when value epoch is greater than target epoch", () => {
+      resolveDateEpochDay
+        .mockReturnValueOnce(3000)
+        .mockReturnValueOnce(2000);
+
+      const res = V.run(
+        { start: ["after:2020-01-01"] },
+        { start: "2025-01-01" },
+      );
+      expect(res.isValid).toBe(true);
+    });
+
+    it("afterOrEqual: valid when value epoch equals target epoch", () => {
+      resolveDateEpochDay
+        .mockReturnValueOnce(2000)
+        .mockReturnValueOnce(2000);
+
+      const res = V.run(
+        { start: ["afterOrEqual:2025-01-01"] },
+        { start: "2025-01-01" },
+      );
+      expect(res.isValid).toBe(true);
+    });
+
+    it("returns false when either resolved epoch is null", () => {
+      resolveDateEpochDay
+        .mockReturnValueOnce(null) // value could not be resolved
+        .mockReturnValueOnce(2000);
+
+      const res = V.run({ dob: ["before:2030-01-01"] }, { dob: "bad-date" });
+      expect(res.isValid).toBe(false);
+    });
   });
 });

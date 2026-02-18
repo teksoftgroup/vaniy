@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import HTTP, { request } from "../src/http.js";
+import HTTP, { request, get, post, put, del } from "../src/http.js";
 
 function makeFetchResponse({
   ok = true,
@@ -35,10 +35,14 @@ function makeFetchResponse({
 
 describe("http.js", () => {
   beforeEach(() => {
-    
-    // reset module config
-    HTTP.base("").timeout(8000).interceptRequest(null).interceptResponse(null);
-    
+    // reset module config (bearer(null) clears token fn, status handlers persist but
+    // existing tests only use 200 responses so they don't conflict)
+    HTTP.base("").timeout(8000).interceptRequest(null).interceptResponse(null).bearer(null);
+
+    // clear localStorage between tests (used by local storage cache tests)
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+
     // mock fetch + timers
     vi.useFakeTimers();
     global.fetch = vi.fn();
@@ -59,6 +63,22 @@ describe("http.js", () => {
   it("base() and timeout() are chainable", () => {
     const res = HTTP.base("https://api.example.com").timeout(1234);
     expect(res).toBe(HTTP);
+  });
+
+  it("ping() logs PONG", () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    HTTP.ping();
+    expect(spy).toHaveBeenCalledWith("PONG");
+  });
+
+  it("falls back to text when response JSON parse fails", async () => {
+    // Passing no jsonData means res.json() throws → falls back to res.text()
+    global.fetch.mockResolvedValue(
+      makeFetchResponse({ ok: true, status: 200, textData: "plain text" }),
+    );
+
+    const data = await HTTP.get("/text-only");
+    expect(data).toBe("plain text");
   });
 
   it("request(GET) builds URL with base + params and calls fetch", async () => {
@@ -225,6 +245,62 @@ describe("http.js", () => {
       expect(data).toEqual({ cached: 1 });
     });
 
+    it("local storage adapter caches and serves data on second request", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { from: "net" } }),
+      );
+
+      const cache = { strategy: "cache-first", ttl: 10_000, storage: "local" };
+
+      const a = await HTTP.get("/ls", { cache });
+      expect(a).toEqual({ from: "net" });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      // Second call should be served from localStorage, not fetch
+      const b = await HTTP.get("/ls", { cache });
+      expect(b).toEqual({ from: "net" });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("local storage adapter returns null for expired entries and re-fetches", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { v: 1 } }),
+      );
+
+      const cache = { strategy: "cache-first", ttl: 100, storage: "local" };
+      await HTTP.get("/ls-ttl", { cache });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      // advance beyond TTL so the stored entry expires
+      vi.advanceTimersByTime(200);
+
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { v: 2 } }),
+      );
+
+      const data = await HTTP.get("/ls-ttl", { cache });
+      expect(data).toEqual({ v: 2 });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("local storage adapter handles a corrupted JSON entry and falls through to network", async () => {
+      // Pre-seed localStorage with invalid JSON under the key that buildCacheKey would generate
+      const cacheKey = "H|GET|/corrupt";
+      window.localStorage.setItem(cacheKey, "not-valid-json");
+
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { fresh: true } }),
+      );
+
+      const cache = {
+        strategy: "cache-first",
+        key: cacheKey,
+        storage: "local",
+      };
+      const data = await HTTP.get("/corrupt", { cache });
+      expect(data).toEqual({ fresh: true });
+    });
+
     it("cache TTL expires (memory storage)", async () => {
       global.fetch.mockResolvedValueOnce(
         makeFetchResponse({ ok: true, status: 200, jsonData: { v: 1 } }),
@@ -248,6 +324,39 @@ describe("http.js", () => {
   });
 
   describe("download()", () => {
+    it("throws when response is not ok", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({
+          ok: false,
+          status: 404,
+          textData: "Not Found",
+        }),
+      );
+
+      await expect(HTTP.download("/missing")).rejects.toThrow(
+        "Download failed 404",
+      );
+    });
+
+    it("uses fallback blob() when body.getReader is not available", async () => {
+      const onProgress = vi.fn();
+
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({
+          ok: true,
+          status: 200,
+          headers: { "Content-Disposition": 'attachment; filename="blob.txt"' },
+          textData: "fallback content",
+          // body is null → will use res.blob() path
+        }),
+      );
+
+      const res = await HTTP.download("/dl-blob", { onProgress });
+      expect(res.filename).toBe("blob.txt");
+      // onProgress(1, 1, 100) is called for the non-streaming path
+      expect(onProgress).toHaveBeenCalledWith(1, 1, 100);
+    });
+
     it("infers filename from Content-Disposition and triggers anchor click", async () => {
       global.fetch.mockResolvedValue(
         makeFetchResponse({
@@ -514,6 +623,104 @@ describe("http.js", () => {
       }
     });
 
+    it("upload calls onProgress with null totals when length is not computable", async () => {
+      const xhr = mockXHR({
+        status: 200,
+        responseText: "{}",
+        contentType: "application/json",
+      });
+      const { restore } = installMockXMLHttpRequest(xhr);
+      const onProgress = vi.fn();
+
+      try {
+        const p = HTTP.upload("/up", { files: new Blob(["x"]), onProgress });
+
+        // fire progress without computable length
+        xhr.upload.onprogress?.({ loaded: 50, total: 0, lengthComputable: false });
+
+        xhr.readyState = 4;
+        xhr.onreadystatechange?.();
+        await p;
+
+        expect(onProgress).toHaveBeenCalledWith(50, null, null);
+      } finally {
+        restore();
+      }
+    });
+
+    it("upload calls responseInterceptor with a fake response object", async () => {
+      const xhr = mockXHR({
+        status: 200,
+        responseText: "{}",
+        contentType: "application/json",
+      });
+      const { restore } = installMockXMLHttpRequest(xhr);
+      const interceptor = vi.fn();
+      HTTP.interceptResponse(interceptor);
+
+      try {
+        const p = HTTP.upload("/up", { files: new Blob(["x"]) });
+
+        xhr.readyState = 4;
+        xhr.onreadystatechange?.();
+        await p;
+
+        expect(interceptor).toHaveBeenCalledTimes(1);
+        const [fakeRes] = interceptor.mock.calls[0];
+        expect(fakeRes.status).toBe(200);
+        expect(fakeRes.ok).toBe(true);
+        expect(typeof fakeRes.json).toBe("function");
+      } finally {
+        restore();
+      }
+    });
+
+    it("upload includes bearer token header via a function token", async () => {
+      const xhr = mockXHR({
+        status: 200,
+        responseText: "{}",
+        contentType: "application/json",
+      });
+      const { restore } = installMockXMLHttpRequest(xhr);
+      HTTP.bearer(() => "fn-upload-token");
+
+      try {
+        const p = HTTP.upload("/up", { files: new Blob(["x"]) });
+
+        xhr.readyState = 4;
+        xhr.onreadystatechange?.();
+        await p;
+
+        expect(xhr.setRequestHeader).toHaveBeenCalledWith(
+          "Authorization",
+          "Bearer fn-upload-token",
+        );
+      } finally {
+        restore();
+      }
+    });
+
+    it("upload safeJson returns raw text when response JSON is malformed", async () => {
+      const xhr = mockXHR({
+        status: 200,
+        responseText: "not-valid-json",
+        contentType: "application/json",
+      });
+      const { restore } = installMockXMLHttpRequest(xhr);
+
+      try {
+        const p = HTTP.upload("/up", { files: new Blob(["x"]) });
+
+        xhr.readyState = 4;
+        xhr.onreadystatechange?.();
+
+        // JSON.parse("not-valid-json") throws → safeJson catch → returns raw string
+        await expect(p).resolves.toBe("not-valid-json");
+      } finally {
+        restore();
+      }
+    });
+
     it("upload aborts when signal is aborted", async () => {
       const xhr = mockXHR();
       const { restore } = installMockXMLHttpRequest(xhr);
@@ -537,6 +744,211 @@ describe("http.js", () => {
       } finally {
         restore();
       }
+    });
+  });
+
+  describe("bearer()", () => {
+    it("is chainable", () => {
+      expect(HTTP.bearer("tok")).toBe(HTTP);
+    });
+
+    it("adds Authorization: Bearer <token> header to requests", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { ok: true } }),
+      );
+
+      HTTP.bearer("my-secret-token");
+      await HTTP.get("/protected");
+
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.headers["Authorization"]).toBe("Bearer my-secret-token");
+    });
+
+    it("resolves token from a function on each request", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: {} }),
+      );
+
+      let token = "token-v1";
+      HTTP.bearer(() => token);
+      await HTTP.get("/a");
+
+      const [, cfg1] = global.fetch.mock.calls[0];
+      expect(cfg1.headers["Authorization"]).toBe("Bearer token-v1");
+
+      token = "token-v2";
+      await HTTP.get("/b");
+
+      const [, cfg2] = global.fetch.mock.calls[1];
+      expect(cfg2.headers["Authorization"]).toBe("Bearer token-v2");
+    });
+
+    it("uses a custom header name without the Bearer prefix", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: {} }),
+      );
+
+      HTTP.bearer("my-api-key", "X-API-Key");
+      await HTTP.get("/api");
+
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.headers["X-API-Key"]).toBe("my-api-key");
+      expect(cfg.headers["Authorization"]).toBeUndefined();
+    });
+
+    it("does not add header when token is null", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: {} }),
+      );
+
+      HTTP.bearer(null);
+      await HTTP.get("/open");
+
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.headers["Authorization"]).toBeUndefined();
+    });
+
+    it("does not add header when token function returns null", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: {} }),
+      );
+
+      HTTP.bearer(() => null);
+      await HTTP.get("/open");
+
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.headers["Authorization"]).toBeUndefined();
+    });
+  });
+
+  describe("status handlers", () => {
+    it("onStatus() is chainable", () => {
+      const result = HTTP.onStatus(418, () => {});
+      expect(result).toBe(HTTP);
+    });
+
+    it("onUnauthorized() is chainable", () => {
+      expect(HTTP.onUnauthorized(() => {})).toBe(HTTP);
+    });
+
+    it("onForbidden() is chainable", () => {
+      expect(HTTP.onForbidden(() => {})).toBe(HTTP);
+    });
+
+    it("onInternalServerError() is chainable", () => {
+      expect(HTTP.onInternalServerError(() => {})).toBe(HTTP);
+    });
+
+    it("onStatus() fires the handler when response has the matching status", async () => {
+      const handler = vi.fn();
+      HTTP.onStatus(418, handler);
+
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: false, status: 418, jsonData: { err: "teapot" } }),
+      );
+
+      await HTTP.get("/brew").catch(() => {});
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      const [res, ctx] = handler.mock.calls[0];
+      expect(res.status).toBe(418);
+      expect(ctx).toMatchObject({ method: "GET" });
+    });
+
+    it("onUnauthorized() fires for 401 responses", async () => {
+      const handler = vi.fn();
+      HTTP.onUnauthorized(handler);
+
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: false, status: 401, jsonData: { msg: "unauth" } }),
+      );
+
+      await HTTP.get("/secure").catch(() => {});
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][0].status).toBe(401);
+    });
+
+    it("onForbidden() fires for 403 responses", async () => {
+      const handler = vi.fn();
+      HTTP.onForbidden(handler);
+
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: false, status: 403, jsonData: { msg: "forbidden" } }),
+      );
+
+      await HTTP.get("/admin").catch(() => {});
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][0].status).toBe(403);
+    });
+
+    it("onInternalServerError() fires for 500 responses", async () => {
+      const handler = vi.fn();
+      HTTP.onInternalServerError(handler);
+
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: false, status: 500, jsonData: { msg: "crash" } }),
+      );
+
+      await HTTP.get("/broken").catch(() => {});
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][0].status).toBe(500);
+    });
+
+    it("status handler does not fire for non-matching status codes", async () => {
+      const handler = vi.fn();
+      HTTP.onStatus(404, handler);
+
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { ok: true } }),
+      );
+
+      await HTTP.get("/ok");
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("convenience methods", () => {
+    it("get() calls request with GET method", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { method: "GET" } }),
+      );
+      const data = await get("/test");
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.method).toBe("GET");
+      expect(data).toEqual({ method: "GET" });
+    });
+
+    it("post() calls request with POST method and body", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { ok: true } }),
+      );
+      await post("/test", { name: "Alice" });
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.method).toBe("POST");
+      expect(cfg.body).toBe(JSON.stringify({ name: "Alice" }));
+    });
+
+    it("put() calls request with PUT method and body", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { ok: true } }),
+      );
+      await put("/test", { id: 1 });
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.method).toBe("PUT");
+      expect(cfg.body).toBe(JSON.stringify({ id: 1 }));
+    });
+
+    it("del() calls request with DELETE method", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { ok: true } }),
+      );
+      await del("/test");
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.method).toBe("DELETE");
     });
   });
 });

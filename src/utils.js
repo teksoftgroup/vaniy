@@ -50,7 +50,7 @@ function isNumericLike(value) {
   if (typeof value === "number") return Number.isFinite(value);
   if (typeof value !== "string") return false;
 
-  const s = v.trim();
+  const s = value.trim();
   if (!s) return false;
   return /^-?\d+(\.\d+)?$/.test(s);
 }
@@ -87,6 +87,7 @@ export function observe(obj, onChange) {
     set(target, key, value) {
       Reflect.set(target, key, value);
       onChange({ key, value });
+      return true;
     },
   });
 }

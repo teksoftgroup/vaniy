@@ -29,6 +29,8 @@ let _base = "";
 let _timeout = 8000;
 let _requestInterceptor = null;
 let _responseInterceptor = null;
+let _bearerTokenFn = null;
+const _statusHandlers = new Map();
 
 const memoryStore = new Map();
 const now = () => Date.now();
@@ -191,6 +193,16 @@ export async function request(method, url, opts = {}) {
     signal: controller.signal,
   };
 
+  if (_bearerTokenFn) {
+    const { token, headerName } = _bearerTokenFn;
+    const tokenValue = typeof token === "function" ? token() : token;
+
+    if (tokenValue) {
+      const prefix = headerName === "Authorization" ? "Bearer " : "";
+      config.headers[headerName] = `${prefix}${tokenValue}`;
+    }
+  }
+
   if (body !== undefined) {
     if (body instanceof FormData) {
       config.body = body;
@@ -206,6 +218,11 @@ export async function request(method, url, opts = {}) {
 
   try {
     let res = await fetch(finalUrl, config);
+
+    if (_statusHandlers.has(res.status)) {
+      _statusHandlers.get(res.status)(res, { method, url: finalUrl });
+    }
+    
     clearTimeout(timeoutId);
 
     if (_responseInterceptor) {
@@ -410,8 +427,20 @@ export function upload(
     const xhr = new XMLHttpRequest();
     xhr.open(method, finalUrl, true);
 
-    // apply interceptors (request)
     let cfg = { method, headers: { ...headers } };
+
+    if (_bearerTokenFn) {
+      const { token, headerName } = _bearerTokenFn;
+      const tokenValue = typeof token === "function" ? token() : token;
+
+      if (tokenValue) {
+        const prefix = headerName === "Authorization" ? "Bearer " : "";
+        cfg.headers[headerName] = `${prefix}${tokenValue}`;
+      }
+    }
+
+    // apply interceptors (request)
+
     if (_requestInterceptor) {
       cfg = _requestInterceptor(cfg) || cfg;
     }
@@ -540,6 +569,39 @@ const HTTP = {
   timeout(ms) {
     _timeout = ms;
     return HTTP;
+  },
+  /**
+   * Set bearer token for all requests.
+   * @param {string|(() => string|null)} token - Token string or getter function
+   * @param {string} [headerName="Authorization"] - Header name
+   * @returns {typeof HTTP}
+   *
+   * @example
+   * // Static token
+   * HTTP.bearer("my-token");
+   *
+   * // From localStorage (re-reads on each request)
+   * HTTP.bearer(() => localStorage.getItem("auth_token"));
+   *
+   * // Custom header name
+   * HTTP.bearer(() => localStorage.getItem("api_key"), "X-API-Key");
+   */
+  bearer(token, headerName = "Authorization") {
+    _bearerTokenFn = { token, headerName };
+    return HTTP;
+  },
+  onStatus(status, fn) {
+    _statusHandlers.set(status, fn);
+    return HTTP;
+  },
+  onUnauthorized(fn) {
+    return HTTP.onStatus(401, fn);
+  },
+  onForbidden(fn) {
+    return HTTP.onStatus(403, fn);
+  },
+  onInternalServerError(fn) {
+    return HTTP.onStatus(500, fn);
   },
   /**
    * Request interceptor hook.

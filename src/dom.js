@@ -179,6 +179,14 @@ export const scan = (rootSelector, options = {}) => {
         if (prop === "all")
           return (k) =>
             cache[k] ? (Array.isArray(cache[k]) ? cache[k] : [cache[k]]) : [];
+        if (prop === "on") {
+          return (refName, event, handler) => {
+            const els = cache[refName];
+            (Array.isArray(els) ? els : [els]).forEach((el) =>
+              el?.on(event, handler),
+            );
+          };
+        }
 
         if (typeof prop !== "string") return undefined;
 

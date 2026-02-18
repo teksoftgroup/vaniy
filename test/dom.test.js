@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { Q, all, makeId, parseHtml, make, onPageLoad, scan } from "../src/dom";
+import { Q, all, makeId, parseHtml, make, onPageLoad, onWindowLoad, scan } from "../src/dom";
 
 describe("dom.js", () => {
   beforeEach(() => {
@@ -71,6 +71,144 @@ describe("dom.js", () => {
     // In jsdom, readyState is usually "complete" or "interactive"
     onPageLoad(cb);
     expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it("onWindowLoad() assigns callback to window.onload", () => {
+    const cb = vi.fn();
+    onWindowLoad(cb);
+    expect(window.onload).toBe(cb);
+  });
+
+  describe("Q() - class manipulation", () => {
+    it("addClass() adds a class to the element", () => {
+      Q("#a").addClass("active");
+      expect(document.querySelector("#a").classList.contains("active")).toBe(true);
+    });
+
+    it("addClass() is chainable", () => {
+      const w = Q("#a");
+      expect(w.addClass("x")).toBe(w);
+    });
+
+    it("removeClass() removes a class from the element", () => {
+      document.querySelector("#a").classList.add("active");
+      Q("#a").removeClass("active");
+      expect(document.querySelector("#a").classList.contains("active")).toBe(false);
+    });
+
+    it("removeClass() is chainable", () => {
+      const w = Q("#a");
+      expect(w.removeClass("x")).toBe(w);
+    });
+
+    it("hasClass() returns true when element has the class", () => {
+      document.querySelector("#a").classList.add("box");
+      expect(Q("#a").hasClass("box")).toBe(true);
+    });
+
+    it("hasClass() returns false when element does not have the class", () => {
+      expect(Q("#a").hasClass("nope")).toBe(false);
+    });
+  });
+
+  describe("Q() - visibility", () => {
+    it("hide() sets display to none", () => {
+      Q("#a").hide();
+      expect(document.querySelector("#a").style.display).toBe("none");
+    });
+
+    it("hide() is chainable", () => {
+      const w = Q("#a");
+      expect(w.hide()).toBe(w);
+    });
+
+    it("show() clears the display style", () => {
+      document.querySelector("#a").style.display = "none";
+      Q("#a").show();
+      expect(document.querySelector("#a").style.display).toBe("");
+    });
+
+    it("show() is chainable", () => {
+      const w = Q("#a");
+      expect(w.show()).toBe(w);
+    });
+
+    it("toggle() hides a visible element", () => {
+      Q("#a").toggle();
+      expect(document.querySelector("#a").style.display).toBe("none");
+    });
+
+    it("toggle() shows a hidden element", () => {
+      document.querySelector("#a").style.display = "none";
+      Q("#a").toggle();
+      expect(document.querySelector("#a").style.display).toBe("");
+    });
+
+    it("toggle() is chainable", () => {
+      const w = Q("#a");
+      expect(w.toggle()).toBe(w);
+    });
+  });
+
+  describe("Q() - styles, props, attrs", () => {
+    it("css() applies a style object to the element", () => {
+      Q("#a").css({ color: "red", fontWeight: "bold" });
+      const el = document.querySelector("#a");
+      expect(el.style.color).toBe("red");
+      expect(el.style.fontWeight).toBe("bold");
+    });
+
+    it("css() is chainable", () => {
+      const w = Q("#a");
+      expect(w.css({ color: "blue" })).toBe(w);
+    });
+
+    it("prop() reads a property from the element", () => {
+      expect(Q("#inp").prop("tagName")).toBe("INPUT");
+    });
+
+    it("attr() reads an attribute from the element", () => {
+      document.querySelector("#a").setAttribute("data-id", "99");
+      expect(Q("#a").attr("data-id")).toBe("99");
+    });
+
+    it("removeAttr() removes an attribute from the element", () => {
+      document.querySelector("#a").setAttribute("data-foo", "bar");
+      Q("#a").removeAttr("data-foo");
+      expect(document.querySelector("#a").getAttribute("data-foo")).toBeNull();
+    });
+  });
+
+  describe("Q() - events", () => {
+    it("on() registers an event listener", () => {
+      const handler = vi.fn();
+      Q("#a").on("click", handler);
+      document.querySelector("#a").click();
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it("off() removes an event listener", () => {
+      const handler = vi.fn();
+      const el = document.querySelector("#a");
+      Q("#a").on("click", handler);
+      Q("#a").off("click", handler);
+      el.click();
+      expect(handler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Q() - null element safety", () => {
+    it("returns undefined for methods when element does not exist", () => {
+      expect(Q("#does-not-exist").text()).toBeUndefined();
+      expect(Q("#does-not-exist").html()).toBeUndefined();
+      expect(Q("#does-not-exist").val()).toBeUndefined();
+    });
+
+    it("safe methods return undefined for null element", () => {
+      expect(Q("#does-not-exist").prop("id")).toBeUndefined();
+      expect(Q("#does-not-exist").attr("class")).toBeUndefined();
+      expect(Q("#does-not-exist").hasClass("x")).toBeUndefined();
+    });
   });
 });
 
@@ -174,5 +312,26 @@ describe("dom.js - scan()", () => {
 
     expect(refs.save.elt.tagName).toBe("BUTTON");
     expect(refs.label.text()).toBe("Hello");
+  });
+
+  it("scan() .on() attaches event listener to a single ref", () => {
+    const refs = scan("#root");
+    const handler = vi.fn();
+
+    refs.on("save", "click", handler);
+    document.querySelector('[v-ref="save"]').click();
+
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("scan() .on() attaches event listener to all refs with the same name", () => {
+    const refs = scan("#root");
+    const handler = vi.fn();
+
+    refs.on("row", "click", handler);
+
+    document.querySelectorAll('[v-ref="row"]').forEach((el) => el.click());
+
+    expect(handler).toHaveBeenCalledTimes(2);
   });
 });

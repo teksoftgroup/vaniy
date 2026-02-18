@@ -1,4 +1,6 @@
 let _tracking = null;
+let _batching = null;
+let _pending = new Set();
 
 export function signal(initial) {
   let _val = initial;
@@ -45,4 +47,18 @@ export function computed(fn) {
     s.val = fn();
   });
   return s;
+}
+
+export function batch(fn) {
+  _batching = true;
+  fn();
+  _batching = false;
+  _pending.forEach((f) => f());
+  _pending.clear();
+}
+
+export function when(sig, fn) {
+  return effect(() => {
+    if (sig.val) fn(sig.val);
+  });
 }

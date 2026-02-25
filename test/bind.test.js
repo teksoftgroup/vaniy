@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { signal } from "../src/reactive.js";
-import { bind, bindList, bindOptions, bindClass, bindAttr } from "../src/bind.js";
+import { bind, bindText, bindHtml, bindValue, bindList, bindOptions, bindClass, bindAttr } from "../src/bind.js";
 import { Q } from "../src/dom.js";
 
 describe("bind.js", () => {
@@ -146,6 +146,69 @@ describe("bind.js", () => {
       const s = signal("direct");
       bind(wrapped, "text", s);
       expect(Q("#box").text()).toBe("direct");
+    });
+  });
+
+  describe("bindText()", () => {
+    it("sets element text immediately from signal", () => {
+      const s = signal("hello");
+      bindText("#box", s);
+      expect(Q("#box").text()).toBe("hello");
+    });
+
+    it("updates element text when signal changes", () => {
+      const s = signal("first");
+      bindText("#box", s);
+      s.val = "second";
+      expect(Q("#box").text()).toBe("second");
+    });
+
+    it("accepts a Q-wrapped element as target", () => {
+      const s = signal("wrapped");
+      bindText(Q("#box"), s);
+      expect(Q("#box").text()).toBe("wrapped");
+    });
+  });
+
+  describe("bindHtml()", () => {
+    it("sets innerHTML immediately from signal", () => {
+      const s = signal("<strong>hi</strong>");
+      bindHtml("#box", s);
+      expect(document.querySelector("#box").innerHTML).toBe("<strong>hi</strong>");
+    });
+
+    it("updates innerHTML when signal changes", () => {
+      const s = signal("<em>a</em>");
+      bindHtml("#box", s);
+      s.val = "<em>b</em>";
+      expect(document.querySelector("#box").innerHTML).toBe("<em>b</em>");
+    });
+
+    it("accepts a Q-wrapped element as target", () => {
+      const s = signal("<b>wrapped</b>");
+      bindHtml(Q("#box"), s);
+      expect(document.querySelector("#box").innerHTML).toBe("<b>wrapped</b>");
+    });
+  });
+
+  describe("bindValue()", () => {
+    it("sets input value immediately from signal", () => {
+      const s = signal("typed");
+      bindValue("#inp", s);
+      expect(document.querySelector("#inp").value).toBe("typed");
+    });
+
+    it("updates input value when signal changes", () => {
+      const s = signal("v1");
+      bindValue("#inp", s);
+      s.val = "v2";
+      expect(document.querySelector("#inp").value).toBe("v2");
+    });
+
+    it("accepts a Q-wrapped element as target", () => {
+      const s = signal("wrapped");
+      bindValue(Q("#inp"), s);
+      expect(document.querySelector("#inp").value).toBe("wrapped");
     });
   });
 

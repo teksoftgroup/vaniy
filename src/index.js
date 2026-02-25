@@ -2,7 +2,16 @@ import EVT from "./evt.js";
 import V from "./validator.js";
 import DOM from "./dom.js";
 import HTTP from "./http.js";
-import { bind, bindList, bindOptions, bindClass, bindAttr } from "./bind.js";
+import {
+  bind,
+  bindText,
+  bindHtml,
+  bindValue,
+  bindList,
+  bindOptions,
+  bindClass,
+  bindAttr,
+} from "./bind.js";
 import {
   useFormHandler,
   FormHandler,
@@ -48,4 +57,13 @@ export {
 export { cache };
 export { queryClient, createQuery };
 export { signal, effect, computed, batch, when };
-export { bind, bindList, bindOptions, bindClass, bindAttr };
+export {
+  bind,
+  bindText,
+  bindHtml,
+  bindValue,
+  bindList,
+  bindOptions,
+  bindClass,
+  bindAttr,
+};

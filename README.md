@@ -374,7 +374,7 @@ user.val = { name: "Alice" }; // → logs "Logged in: Alice"
 Declaratively bind signals to DOM elements. Each function returns the underlying `effect` — call it to stop the binding.
 
 ```javascript
-import { bind, bindList, bindOptions, bindClass, bindAttr } from "vaniy";
+import { bind, bindText, bindHtml, bindValue, bindList, bindOptions, bindClass, bindAttr } from "vaniy";
 ```
 
 All functions accept a CSS selector string or a `Q`-wrapped element as `target`.
@@ -404,6 +404,39 @@ bind("#role-badge", "show", isAdmin);
 bind("#submit", "disabled", isAdmin);
 
 username.val = "Bob"; // → #name text updates instantly
+```
+
+**`bindText(target, signal)`**
+
+Shorthand for `bind(target, "text", signal)`.
+
+```javascript
+const title = signal("Hello");
+bindText("#heading", title);
+
+title.val = "World"; // → #heading text content updates
+```
+
+**`bindHtml(target, signal)`**
+
+Shorthand for `bind(target, "html", signal)`.
+
+```javascript
+const content = signal("<p>Loading...</p>");
+bindHtml("#panel", content);
+
+content.val = "<p>Done</p>"; // → #panel innerHTML updates
+```
+
+**`bindValue(target, signal)`**
+
+Shorthand for `bind(target, "value", signal)`.
+
+```javascript
+const query = signal("");
+bindValue("#search", query);
+
+query.val = "vaniy"; // → #search input value updates
 ```
 
 **`bindList(target, signal, template, empty?)`**

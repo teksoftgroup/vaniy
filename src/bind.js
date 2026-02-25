@@ -37,6 +37,33 @@ export function bind(target, prop, sig) {
   });
 }
 
+export function bindText(target, sig) {
+  const el = getElement(target);
+
+  return effect(() => {
+    const val = sig.val;
+    el.text(val);
+  });
+}
+
+export function bindHtml(target, sig) {
+  const el = getElement(target);
+
+  return effect(() => {
+    const val = sig.val;
+    el.html(val);
+  });
+}
+
+export function bindValue(target, sig) {
+  const el = getElement(target);
+
+  return effect(() => {
+    const val = sig.val;
+    el.val(val);
+  });
+}
+
 export function bindList(target, sig, template, empty = "") {
   const el = getElement(target);
 

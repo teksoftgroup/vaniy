@@ -303,6 +303,79 @@ export const createQuery = (options = {}) => {
     saveToStorage();
   });
 
+  const querySignal = (key, fetcher, options = {}) => {
+    const data = signal(options.inital ?? null);
+    const loading = signal(false);
+    const error = signal(null);
+
+    const unsubscribe = subscribe(key, (entry) => {
+      if (entry?.data) data.val = entry.data;
+      if (entry?.error) error.val = entry.error;
+      loading.val = !!entry?.promise && !entry?.data;
+    });
+
+    const fetch = () => {
+      loading.val = true;
+      return query(key, fetcher, options);
+    };
+
+    const mutateFn = (updater) => {
+      const prev = mutate(key, updater);
+      data.val = getEntry(key)?.data;
+      return prev;
+    };
+
+    const refetch = () => {
+      invalidate(key);
+      return fetch();
+    };
+
+    if (options.enabled !== false) fetch().catch(() => {});
+
+    return { data, loading, error, fetch, refetch, unsubscribe, mutate: mutateFn };
+  };
+
+  const pollingSignal = (key, fetcher, interval, options = {}) => {
+    const qs = querySignal(key, fetcher, { ...options, enabled: false });
+    const stop = startPolling(key, fetcher, interval, options);
+    return { ...qs, stop };
+  };
+
+  const bindQuery = (key, fetcher, options = {}) => {
+    const { target, render, onLoading, onError, poll = null, ...queryOptions } =
+      options;
+
+    const el =
+      typeof target === "string" ? document.querySelector(target) : target;
+
+    const renderData = (data) => {
+      const html = render(data);
+      if (typeof html === "string") el.innerHTML = html;
+    };
+
+    EVT.sub(`query:${key}:success`, ({ data }) => renderData(data));
+    EVT.sub(`query:${key}:set`, ({ data }) => renderData(data));
+    EVT.sub(`query:${key}:mutate`, ({ data }) => renderData(data));
+
+    if (onError) {
+      EVT.sub(`query:${key}:error`, ({ error, staleData }) =>
+        onError(error, staleData, el),
+      );
+    }
+
+    if (onLoading) {
+      EVT.sub(`query:${key}:fetch`, ({ hasCache }) => {
+        if (!hasCache) onLoading(el);
+      });
+    }
+
+    query(key, fetcher, queryOptions).catch(() => {});
+
+    if (poll) {
+      return startPolling(key, fetcher, poll, queryOptions);
+    }
+  };
+
   return {
     query,
     mutate,
@@ -316,6 +389,9 @@ export const createQuery = (options = {}) => {
     stopAllPolling,
     getEntry,
     gc,
+    querySignal,
+    pollingSignal,
+    bindQuery,
     clear: () => {
       cache.clear();
       localStorage.removeItem(persistKey);
@@ -324,94 +400,4 @@ export const createQuery = (options = {}) => {
   };
 };
 
-export const queryClient = createQuery({
-  persistKey: "teksoft-cache",
-  persistedKeys: ["user", "settings"],
-});
-
-export const querySignal = (key, fetcher, options = {}) => {
-  const data = signal(options.inital ?? null);
-  const loading = signal(false);
-  const error = signal(null);
-
-  const unsubscribe = queryClient.subscribe(key, (entry) => {
-    if (entry?.data) data.val = entry.data;
-    if (entry?.error) error.val = entry.error;
-    loading.val = !!entry?.promise && !entry?.data;
-  });
-
-  const fetch = () => {
-    loading.val = true;
-    return queryClient.query(key, fetcher, options);
-  };
-
-  const mutate = (updater) => {
-    const prev = queryClient.mutate(key, updater);
-    data.val = queryClient.getEntry(key)?.data;
-    return prev;
-  };
-
-  const refetch = () => {
-    queryClient.invalidate(key);
-    return fetch();
-  };
-
-  if (options.enabled !== false) fetch();
-
-  return {
-    data,
-    loading,
-    error,
-    fetch,
-    refetch,
-    unsubscribe,
-    mutate,
-  };
-};
-
-export const pollingSignal = (key, fetcher, interval, options = {}) => {
-  const qs = querySignal(key, fetcher, { ...options, enabled: false });
-  const stop = queryClient.startPolling(key, fetcher, interval, options);
-  return { ...qs, stop };
-};
-
-export const bindQuery = (key, fetcher, options = {}) => {
-  const {
-    target,
-    render,
-    onLoading,
-    onError,
-    poll = null,
-    ...queryOptions
-  } = options;
-
-  const el =
-    typeof target === "string" ? document.querySelector(target) : target;
-
-  const renderData = (data) => {
-    const html = render(data);
-    if (typeof html === "string") el.innerHTML = html;
-  };
-
-  EVT.sub(`query:${key}:success`, ({ data }) => renderData(data));
-  EVT.sub(`query:${key}:set`, ({ data }) => renderData(data));
-  EVT.sub(`query:${key}:mutate`, ({ data }) => renderData(data));
-
-  if (onError) {
-    EVT.sub(`query:${key}:error`, ({ error, staleData }) =>
-      onError(error, staleData, el),
-    );
-  }
-
-  if (onLoading) {
-    EVT.sub(`query:${key}:fetch`, ({ hasCache }) => {
-      if (!hasCache) onLoading(el);
-    });
-  }
-
-  queryClient.query(key, fetcher, queryOptions).catch(() => {});
-
-  if (poll) {
-    return queryClient.startPolling(key, fetcher, poll, queryOptions);
-  }
-};
+export const queryClient = createQuery();

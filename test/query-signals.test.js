@@ -20,9 +20,8 @@ vi.stubGlobal("window", {
 });
 
 // Dynamic import so the stubs above are in place when the module loads.
-const { queryClient, querySignal, pollingSignal, bindQuery } = await import(
-  "../src/query.js"
-);
+const { queryClient } = await import("../src/query.js");
+const { querySignal, pollingSignal, bindQuery } = queryClient;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

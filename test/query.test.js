@@ -495,4 +495,236 @@ describe("createQuery", () => {
       expect(fetcher).toHaveBeenCalledOnce();
     });
   });
+
+  // ── querySignal() ─────────────────────────────────────────
+
+  describe("querySignal()", () => {
+    it("returns signals initialized with null", () => {
+      const client = makeClient();
+      const { data, loading, error } = client.querySignal("key", vi.fn(), {
+        enabled: false,
+      });
+
+      expect(data.val).toBeNull();
+      expect(loading.val).toBe(false);
+      expect(error.val).toBeNull();
+    });
+
+    it("uses the inital option as the starting data value", () => {
+      const client = makeClient();
+      const { data } = client.querySignal("key", vi.fn(), {
+        enabled: false,
+        inital: "seed",
+      });
+
+      expect(data.val).toBe("seed");
+    });
+
+    it("fetches immediately by default and updates data signal", async () => {
+      const client = makeClient();
+      const fetcher = vi.fn().mockResolvedValue("result");
+
+      const { data } = client.querySignal("key", fetcher);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(fetcher).toHaveBeenCalledOnce();
+      expect(data.val).toBe("result");
+    });
+
+    it("does not fetch when enabled is false", () => {
+      const client = makeClient();
+      const fetcher = vi.fn();
+
+      client.querySignal("key", fetcher, { enabled: false });
+
+      expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    it("updates error signal on fetch failure", async () => {
+      const client = makeClient();
+      const fetcher = vi.fn().mockRejectedValue(new Error("oops"));
+
+      const { error } = client.querySignal("key", fetcher);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(error.val).toBeInstanceOf(Error);
+      expect(error.val.message).toBe("oops");
+    });
+
+    it("refetch invalidates and re-fetches, updating data signal", async () => {
+      const client = makeClient();
+      const fetcher = vi.fn()
+        .mockResolvedValueOnce("v1")
+        .mockResolvedValueOnce("v2");
+
+      const { data, refetch } = client.querySignal("key", fetcher);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(data.val).toBe("v1");
+
+      await refetch();
+      expect(data.val).toBe("v2");
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    });
+
+    it("mutate updates the data signal", async () => {
+      const client = makeClient();
+      await client.query("key", () => Promise.resolve({ count: 1 }));
+
+      const { data, mutate } = client.querySignal("key", vi.fn(), {
+        enabled: false,
+      });
+      mutate((prev) => ({ count: prev.count + 1 }));
+
+      expect(data.val).toEqual({ count: 2 });
+    });
+
+    it("unsubscribe stops further signal updates", async () => {
+      const client = makeClient({ defaultStaleTime: 0 });
+      const fetcher = vi.fn()
+        .mockResolvedValueOnce("v1")
+        .mockResolvedValueOnce("v2");
+
+      const { data, unsubscribe } = client.querySignal("key", fetcher);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(data.val).toBe("v1");
+
+      unsubscribe();
+      client.invalidate("key");
+      await client.query("key", fetcher);
+
+      expect(data.val).toBe("v1");
+    });
+  });
+
+  // ── pollingSignal() ───────────────────────────────────────
+
+  describe("pollingSignal()", () => {
+    it("includes all querySignal properties plus stop", () => {
+      const client = makeClient();
+      const qs = client.pollingSignal("key", vi.fn().mockResolvedValue("x"), 1000);
+
+      expect(qs).toHaveProperty("data");
+      expect(qs).toHaveProperty("loading");
+      expect(qs).toHaveProperty("error");
+      expect(qs).toHaveProperty("fetch");
+      expect(qs).toHaveProperty("refetch");
+      expect(qs).toHaveProperty("mutate");
+      expect(qs).toHaveProperty("stop");
+      expect(typeof qs.stop).toBe("function");
+
+      qs.stop();
+    });
+
+    it("fetches on the given interval and updates data signal", async () => {
+      const client = makeClient();
+      const fetcher = vi.fn().mockResolvedValue("data");
+
+      const { data, stop } = client.pollingSignal("key", fetcher, 1000);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(data.val).toBe("data");
+      expect(fetcher).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(fetcher).toHaveBeenCalledTimes(2);
+
+      stop();
+    });
+
+    it("stop halts further polling", async () => {
+      const client = makeClient();
+      const fetcher = vi.fn().mockResolvedValue("data");
+
+      const { stop } = client.pollingSignal("key", fetcher, 1000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      stop();
+
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── bindQuery() ───────────────────────────────────────────
+
+  describe("bindQuery()", () => {
+    let el;
+
+    beforeEach(() => {
+      el = { innerHTML: "" };
+      document.querySelector.mockReturnValue(el);
+    });
+
+    it("renders data to the target element on success", async () => {
+      const client = makeClient();
+      const fetcher = vi.fn().mockResolvedValue("hello");
+
+      client.bindQuery("key", fetcher, {
+        target: "#app",
+        render: (data) => `<p>${data}</p>`,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(el.innerHTML).toBe("<p>hello</p>");
+    });
+
+    it("calls onLoading when there is no cached data", async () => {
+      const client = makeClient();
+      const onLoading = vi.fn();
+
+      client.bindQuery("key", vi.fn().mockResolvedValue("data"), {
+        target: "#app",
+        render: () => "",
+        onLoading,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(onLoading).toHaveBeenCalledWith(el);
+    });
+
+    it("calls onError with the error and stale data on failure", async () => {
+      const client = makeClient();
+      const onError = vi.fn();
+      const err = new Error("fail");
+
+      client.bindQuery("key", vi.fn().mockRejectedValue(err), {
+        target: "#app",
+        render: () => "",
+        onError,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(onError).toHaveBeenCalledWith(err, null, el);
+    });
+
+    it("accepts an element reference directly as target", async () => {
+      const client = makeClient();
+      const fetcher = vi.fn().mockResolvedValue("direct");
+
+      client.bindQuery("key", fetcher, {
+        target: el,
+        render: (data) => data,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(el.innerHTML).toBe("direct");
+    });
+
+    it("starts polling and returns a stop function when poll is set", async () => {
+      const client = makeClient();
+      const fetcher = vi.fn().mockResolvedValue("polled");
+
+      const stop = client.bindQuery("key", fetcher, {
+        target: "#app",
+        render: (d) => d,
+        poll: 1000,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(fetcher).toHaveBeenCalledTimes(2);
+
+      stop();
+    });
+  });
 });

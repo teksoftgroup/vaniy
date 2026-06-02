@@ -40,6 +40,8 @@ import {
 import { cache } from "./cache.js";
 import { queryClient, createQuery } from "./query.js";
 import { signal, effect, computed, batch, when } from "./reactive.js";
+import { tag, createPresets } from "./ui.js";
+import { mount } from "./component.js";
 
 export { EVT, V, DOM, HTTP };
 export { get, post, put, del, raw, upload, download, request };
@@ -67,3 +69,6 @@ export {
   bindClass,
   bindAttr,
 };
+export { tag, createPresets };
+export { mount };
+export { html, render } from "./template.js";

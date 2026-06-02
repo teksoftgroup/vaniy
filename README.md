@@ -11,6 +11,8 @@ Vaniy is how we say vanilla in my language.
 - **Form Handling** - Validation engine with error rendering
 - **Reactivity** - Fine-grained signals, effects, computed values, and batching
 - **DOM Bindings** - Declaratively bind signals to DOM elements
+- **UI Builder** - Fluent, framework-agnostic element builder with reactive list binding and themeable presets
+- **Components** - Encapsulated, mountable UI units with their own state, template, and lifecycle
 - **Query Cache** - Configurable async data cache with signals, polling, and DOM bindings
 - **Zero Dependencies** - Pure vanilla JavaScript
 
@@ -499,6 +501,284 @@ const progress = signal(0);
 bindAttr("#bar", "aria-valuenow", progress);
 
 progress.val = 75; // → <div id="bar" aria-valuenow="75">
+```
+
+### Components
+
+Self-contained UI units that own their DOM, state, and lifecycle. Sit naturally below a `definePage` and above raw `tag()` builders.
+
+```javascript
+import { defineComponent, tag, signal, bindText } from "vaniy";
+```
+
+#### `defineComponent(config)`
+
+Defines a reusable component. Returns a definition object with a single `mount()` method.
+
+```javascript
+const Counter = defineComponent({
+  // 1. Create signals and state — runs before template
+  setup() {
+    this.count = signal(this.props.initial ?? 0);
+  },
+
+  // 2. Build the DOM — return a tag() builder
+  template() {
+    return tag("div").css("counter").child(
+      tag("span"),                              // el for the count display
+      tag("button").text("+").on("click", () => this.count.val++),
+      tag("button").text("−").on("click", () => this.count.val--),
+    );
+  },
+
+  // 3. DOM is ready — bind signals and attach reactive behavior
+  onMount() {
+    const stop = bindText(this.el.elt.querySelector("span"), this.count);
+    this.onCleanup(stop);  // stop the effect when destroyed
+  },
+
+  // 4. Optional: called first when destroy() runs, before cleanups
+  onDestroy() {
+    console.log("Counter unmounted");
+  },
+
+  // 5. Optional: methods available on the instance
+  methods: {
+    reset() { this.count.val = 0; },
+  },
+});
+```
+
+**Mounting:**
+
+```javascript
+// mount(target, props?) — target is a CSS selector or DOM node
+const counter = Counter.mount("#app", { initial: 10 });
+
+// instance.el   — Q-wrapped root element
+// instance.props — the props passed at mount time
+counter.el.elt;        // raw HTMLElement
+counter.props.initial; // 10
+counter.reset();       // call a method
+```
+
+**Lifecycle order:**
+
+| Phase | Hook | When |
+| --- | --- | --- |
+| 1 | `setup()` | Signals and state init |
+| 2 | `template()` | Build and render DOM |
+| 3 | `onMount()` | DOM ready — bind signals, attach events |
+| 4 | `onDestroy()` | First call in `destroy()` |
+| — | cleanups | Registered `onCleanup` functions, in order |
+| — | DOM removal | Root element removed from the DOM |
+
+**`this.onCleanup(fn)`** — register any teardown to run on `destroy()`:
+
+```javascript
+onMount() {
+  // stop a reactive binding
+  const stopBind = bindText(this.el, this.title);
+  this.onCleanup(stopBind);
+
+  // cancel a timer
+  const timer = setInterval(() => this.tick(), 1000);
+  this.onCleanup(() => clearInterval(timer));
+
+  // unsubscribe from a signal
+  const unsub = someSignal.subscribe(() => { ... });
+  this.onCleanup(unsub);
+}
+```
+
+**`instance.destroy()`** — unmounts the component: runs `onDestroy`, executes all cleanups, removes the root element from the DOM:
+
+```javascript
+const modal = Modal.mount("#overlay", { title: "Confirm" });
+// ...later:
+modal.destroy(); // DOM removed, effects stopped, timers cleared
+```
+
+**Usage inside a page:**
+
+```javascript
+import { definePage, mountPage, defineComponent } from "vaniy";
+import { UserCard } from "./components/user-card.js";
+
+mountPage(definePage({
+  root: "#app",
+  setup() {
+    this.card = UserCard.mount(this.refs._.sidebar.elt, { name: "Alice" });
+  },
+  cleanup() {
+    this.card.destroy();
+  },
+}));
+```
+
+**Multiple independent instances from one definition:**
+
+```javascript
+const Tag = defineComponent({
+  template() { return tag("span").css("tag").text(this.props.label); },
+});
+
+Tag.mount("#tags", { label: "JavaScript" });
+Tag.mount("#tags", { label: "Vanilla" });
+Tag.mount("#tags", { label: "No dependencies" });
+```
+
+### UI Builder
+
+A fluent, chainable DOM element builder with support for reactive list binding and CSS-framework-agnostic theming via `createPresets`.
+
+```javascript
+import { tag, createPresets } from "vaniy";
+```
+
+#### `tag(tagName)`
+
+Creates a builder for any HTML element. All methods return the builder for chaining. Call `.render()` to produce the real DOM node (wrapped in a `Q` object).
+
+```javascript
+// Build and render a button
+const btn = tag("button")
+  .text("Save")
+  .css("btn btn-primary")
+  .on("click", () => console.log("saved"))
+  .render("#app"); // appends to #app and returns Q-wrapped element
+
+// Build a card with children
+tag("div")
+  .css("card")
+  .child(
+    tag("h2").text("Title"),
+    tag("p").text("Body copy"),
+  )
+  .render("#app");
+```
+
+**Builder methods:**
+
+| Method | Description |
+| --- | --- |
+| `.text(str)` | Set `textContent` |
+| `.html(str)` | Set `innerHTML` |
+| `.css(classes)` | Set the `class` attribute |
+| `.attr(key, value)` | Set an arbitrary attribute |
+| `.data(key, value)` | Set a `data-*` attribute |
+| `.on(event, fn)` | Attach a DOM event listener |
+| `.child(...builders)` | Append child builders or DOM elements |
+| `.when(condition)` | Render only when `condition` is truthy; no-op otherwise |
+| `.bindList(sig, itemFn, empty?)` | Reactively render a signal array as children |
+| `.render(target?)` | Build the element, optionally mount to a selector or DOM node |
+
+**`.when(condition)`** — conditionally include an element without breaking the chain:
+
+```javascript
+tag("span")
+  .text("Admin only")
+  .when(user.isAdmin) // returns noop builder if false; render() → null
+  .render("#app");
+```
+
+**`.bindList(signal, itemFn, empty?)`** — reactively render an array signal as children. Re-renders automatically when the signal changes:
+
+```javascript
+import { signal } from "vaniy";
+
+const todos = signal([]);
+
+tag("ul")
+  .bindList(
+    todos,
+    (todo, i) => tag("li").text(`${i + 1}. ${todo.title}`),
+    "<li>No todos yet.</li>", // shown when list is empty
+  )
+  .render("#app");
+
+todos.val = [{ title: "Buy milk" }, { title: "Write tests" }];
+// → <ul><li>1. Buy milk</li><li>2. Write tests</li></ul>
+```
+
+#### `createPresets(theme)`
+
+Returns a set of pre-built component factories driven by a theme object that maps token names to CSS class strings. Works with any CSS framework (Tailwind, Bootstrap, plain CSS, etc.).
+
+```javascript
+// Tailwind theme
+const ui = createPresets({
+  btnBase:        "font-medium px-6 py-2.5 rounded-full text-sm transition-colors",
+  "btn.default":  "bg-blue-600 text-white hover:bg-blue-700",
+  "btn.danger":   "bg-red-600 text-white hover:bg-red-700",
+  pill:           "inline-block text-xs font-medium bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full",
+  fieldLabel:     "block text-xs font-medium text-gray-600 mb-1",
+  fieldInput:     "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm",
+  fieldRequired:  "text-red-400",
+  fieldOptional:  "text-gray-400 font-normal",
+  fieldWrap:      "",
+  fieldWrapSpan2: "sm:col-span-2",
+  sectionLabel:   "text-xs font-medium text-gray-500 uppercase tracking-wide mb-2",
+  select:         "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm",
+  list:           "space-y-1",
+  listItem:       "px-3 py-2 hover:bg-gray-100 cursor-pointer rounded",
+});
+```
+
+**Available presets:**
+
+**`ui.btn(text, onClick, variant?)`** — button with optional style variant (defaults to `"default"`):
+
+```javascript
+ui.btn("Save", () => save(), "default").render("#toolbar");
+ui.btn("Delete", () => remove(), "danger").render("#toolbar");
+```
+
+**`ui.pill(text, url)`** — badge / tag link:
+
+```javascript
+ui.pill("JavaScript", "/tags/js").render("#tags");
+```
+
+**`ui.field(label, type, opts?)`** — labelled form field (label + input wrapped in a div):
+
+```javascript
+ui.field("Email", "email").render("#form");
+ui.field("Bio", "text", { required: false, span2: true, placeholder: "Tell us about yourself" }).render("#form");
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `required` | `boolean` | `true` | Show required `*` or `(optional)` marker |
+| `span2` | `boolean` | `false` | Use `fieldWrapSpan2` class instead of `fieldWrap` |
+| `value` | `string` | `""` | Pre-fill input value |
+| `name` | `string` | `""` | Input `name` attribute |
+| `placeholder` | `string` | `""` | Input placeholder |
+| `extraCss` | `string` | `""` | Extra classes appended to the input |
+
+**`ui.select(options, onChange)`** — styled `<select>` dropdown:
+
+```javascript
+ui.select(
+  [{ label: "Admin", value: "admin" }, { label: "Editor", value: "editor" }],
+  (value) => console.log("selected:", value),
+).render("#form");
+```
+
+**`ui.list(items, onSelect)`** — clickable `<ul>` list:
+
+```javascript
+ui.list(
+  [{ label: "Alice" }, { label: "Bob" }],
+  (item) => console.log("clicked:", item.label),
+).render("#sidebar");
+```
+
+**`ui.sectionLabel(text, required?)`** — section heading with optional required marker:
+
+```javascript
+ui.sectionLabel("Contact Info").render("#form");
+ui.sectionLabel("Billing Address", true).render("#form");
 ```
 
 ### Query Cache

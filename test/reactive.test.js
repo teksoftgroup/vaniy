@@ -97,16 +97,19 @@ describe("reactive.js", () => {
       expect(fn).toHaveBeenCalledTimes(1);
     });
 
-    it("returns the runner function", () => {
-      const run = effect(() => {});
-      expect(typeof run).toBe("function");
+    it("returns a stop function", () => {
+      const stop = effect(() => {});
+      expect(typeof stop).toBe("function");
     });
 
-    it("can be triggered manually via the returned runner", () => {
-      const fn = vi.fn();
-      const run = effect(fn);
-      run();
-      expect(fn).toHaveBeenCalledTimes(2); // initial + manual
+    it("stops re-running after the returned stop function is called", () => {
+      const s = signal("a");
+      const fn = vi.fn(() => s.val);
+      const stop = effect(fn);
+      fn.mockClear();
+      stop();
+      s.val = "b";
+      expect(fn).not.toHaveBeenCalled();
     });
 
     it("tracks multiple signals used in one effect", () => {

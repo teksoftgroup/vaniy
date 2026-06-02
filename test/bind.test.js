@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { signal } from "../src/reactive.js";
-import { bind, bindText, bindHtml, bindValue, bindList, bindOptions, bindClass, bindAttr } from "../src/bind.js";
+import {
+  bind,
+  bindText,
+  bindHtml,
+  bindValue,
+  bindList,
+  bindOptions,
+  bindClass,
+  bindAttr,
+} from "../src/bind.js";
 import { Q } from "../src/dom.js";
 
 describe("bind.js", () => {
@@ -33,14 +42,14 @@ describe("bind.js", () => {
     it("sets element innerHTML immediately from signal", () => {
       const s = signal("<strong>hi</strong>");
       bind("#box", "html", s);
-      expect(document.querySelector("#box").innerHTML).toBe("<strong>hi</strong>");
+      expect(Q("#box").html()).toBe("<strong>hi</strong>");
     });
 
     it("updates innerHTML when signal changes", () => {
       const s = signal("<em>a</em>");
       bind("#box", "html", s);
       s.val = "<em>b</em>";
-      expect(document.querySelector("#box").innerHTML).toBe("<em>b</em>");
+      expect(Q("#box").html()).toBe("<em>b</em>");
     });
   });
 
@@ -48,28 +57,28 @@ describe("bind.js", () => {
     it("sets input value immediately from signal", () => {
       const s = signal("typed");
       bind("#inp", "value", s);
-      expect(document.querySelector("#inp").value).toBe("typed");
+      expect(Q("#inp").val()).toBe("typed");
     });
 
     it("updates input value when signal changes", () => {
       const s = signal("v1");
       bind("#inp", "value", s);
       s.val = "v2";
-      expect(document.querySelector("#inp").value).toBe("v2");
+      expect(Q("#inp").val()).toBe("v2");
     });
   });
 
   describe("bind() - show", () => {
     it("does not hide element when signal is truthy", () => {
-      const s = signal(true);
-      bind("#box", "show", s);
-      expect(document.querySelector("#box").style.display).not.toBe("none");
+      bind("#box", "show", signal(true));
+      expect(Q("#box").css("display")).not.toBe("none");
     });
 
     it("hides element when signal is falsy", () => {
       const s = signal(false);
       bind("#box", "show", s);
       expect(document.querySelector("#box").style.display).toBe("none");
+      // expect(Q("#box").css("display")).toBe("none");
     });
 
     it("reacts to signal change: truthy->falsy hides element", () => {
@@ -174,7 +183,9 @@ describe("bind.js", () => {
     it("sets innerHTML immediately from signal", () => {
       const s = signal("<strong>hi</strong>");
       bindHtml("#box", s);
-      expect(document.querySelector("#box").innerHTML).toBe("<strong>hi</strong>");
+      expect(document.querySelector("#box").innerHTML).toBe(
+        "<strong>hi</strong>",
+      );
     });
 
     it("updates innerHTML when signal changes", () => {
@@ -331,7 +342,9 @@ describe("bind.js", () => {
       const wrapped = Q("#box");
       const s = signal(true);
       bindClass(wrapped, "selected", s);
-      expect(document.querySelector("#box").classList.contains("selected")).toBe(true);
+      expect(
+        document.querySelector("#box").classList.contains("selected"),
+      ).toBe(true);
     });
   });
 
@@ -358,7 +371,9 @@ describe("bind.js", () => {
       const wrapped = Q("#box");
       const s = signal("42");
       bindAttr(wrapped, "aria-label", s);
-      expect(document.querySelector("#box").getAttribute("aria-label")).toBe("42");
+      expect(document.querySelector("#box").getAttribute("aria-label")).toBe(
+        "42",
+      );
     });
   });
 });

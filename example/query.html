@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UI Example</title>
+  </head>
+  <body>
+    <div v-ref="root">
+      <div v-ref="simple_modal" class="simple-modal">
+        <h1 v-ref="title"></h1>
+        <p v-ref="description"></p>
+      </div>
+      <div v-ref="extended_modal" class="simple-modal">
+        <h1 v-ref="title"></h1>
+        <p v-ref="description"></p>
+      </div>
+    </div>
+    <script src="../dist/vaniy.min.js"></script>
+    <script>
+      const { DOM, EVT, onPageLoad } = vaniy;
+      let ui;
+
+      onPageLoad(() => {
+        EVT.sub("NAME_UPDATE", (data) => {
+          console.log(data);
+        });
+
+        ui = DOM.scan(document.body);
+        console.log(ui.get("title"));
+      });
+    </script>
+  </body>
+</html>

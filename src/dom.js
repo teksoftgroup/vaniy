@@ -161,7 +161,7 @@ export const scan = (rootSelector, options = {}) => {
 
     const wrapped = Q(el);
 
-    // support multple refs with the same name -> array
+    // support multiple refs with the same name -> array
     if (cache[key]) {
       if (Array.isArray(cache[key])) cache[key].push(wrapped);
       else cache[key] = [cache[key], wrapped];

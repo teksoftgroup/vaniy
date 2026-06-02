@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notes — Vaniy Template + Bind</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: system-ui, sans-serif;
+        background: #f4f4f5;
+        color: #18181b;
+        padding: 2rem;
+      }
+
+      .page { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+
+      /* ── Header ──────────────────────────────────────────────────────── */
+      .header { display: flex; align-items: baseline; gap: 1rem; }
+      .header h1 { font-size: 1.4rem; font-weight: 700; }
+      .header .stats { margin-left: auto; font-size: 0.82rem; color: #71717a; }
+      .header .stats span { font-weight: 600; color: #18181b; }
+
+      /* ── Filter tabs (driven by bindClass) ───────────────────────────── */
+      .filters { display: flex; gap: 0.3rem; }
+      .filters button {
+        background: none;
+        border: 1px solid #e4e4e7;
+        border-radius: 6px;
+        padding: 0.3rem 0.75rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+        color: #71717a;
+        transition: all 0.1s;
+      }
+      .filters button:hover { border-color: #a1a1aa; color: #18181b; }
+      .filters button.active { background: #18181b; border-color: #18181b; color: #fff; }
+
+      /* ── Add form (driven by html template) ──────────────────────────── */
+      .add-form {
+        display: flex;
+        gap: 0.5rem;
+        background: #fff;
+        border: 1px solid #e4e4e7;
+        border-radius: 10px;
+        padding: 0.75rem;
+      }
+      .add-form input {
+        flex: 1;
+        border: 1px solid #e4e4e7;
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+        outline: none;
+      }
+      .add-form input:focus { border-color: #6366f1; }
+      .add-form button {
+        background: #6366f1;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .add-form button:hover { background: #4f46e5; }
+
+      /* ── Notes list (driven by html template) ────────────────────────── */
+      .notes-list {
+        background: #fff;
+        border: 1px solid #e4e4e7;
+        border-radius: 10px;
+        list-style: none;
+        overflow: hidden;
+      }
+      .note {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.7rem 1rem;
+        border-bottom: 1px solid #f4f4f5;
+      }
+      .note:last-child { border-bottom: none; }
+      .note:hover { background: #fafafa; }
+      .note input[type="checkbox"] { accent-color: #6366f1; width: 1rem; height: 1rem; cursor: pointer; flex-shrink: 0; }
+      .note-text { flex: 1; font-size: 0.9rem; transition: color 0.15s; }
+      .note.is-done .note-text { text-decoration: line-through; color: #a1a1aa; }
+      .del {
+        background: none;
+        border: none;
+        color: #d4d4d8;
+        font-size: 1.1rem;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0 0.1rem;
+      }
+      .del:hover { color: #ef4444; }
+      .empty { padding: 2rem; text-align: center; color: #a1a1aa; font-size: 0.875rem; }
+
+      /* ── Footer (driven by bind) ─────────────────────────────────────── */
+      .footer { display: flex; justify-content: flex-end; }
+      .footer button {
+        background: none;
+        border: 1px solid #e4e4e7;
+        border-radius: 6px;
+        padding: 0.35rem 0.85rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+        color: #71717a;
+      }
+      .footer button:not(:disabled):hover { border-color: #ef4444; color: #ef4444; }
+      .footer button:disabled { opacity: 0.4; cursor: default; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+
+      <!--
+        Header: static markup with slots driven by bind().
+        bindText fills in the counts; bindClass toggles the active filter tab.
+      -->
+      <div class="header">
+        <h1>Notes</h1>
+        <p class="stats"><span id="total-count">0</span> total · <span id="done-count">0</span> done</p>
+      </div>
+
+      <nav class="filters">
+        <button id="btn-all">All</button>
+        <button id="btn-active">Active</button>
+        <button id="btn-done">Done</button>
+      </nav>
+
+      <!--
+        Form and list: rendered entirely by html`` + render().
+        Event handlers, property bindings, and conditional classes live
+        inside the template — no extra querySelector calls needed.
+      -->
+      <div id="form"></div>
+      <div id="list"></div>
+
+      <!--
+        Footer: static element controlled by bind("disabled").
+      -->
+      <div class="footer">
+        <button id="clear-done">Clear done</button>
+      </div>
+
+    </div>
+
+    <script type="module">
+      import {
+        signal, computed,
+        bind, bindText, bindClass,
+        html, render,
+        Q,
+      } from "../src/index.js";
+
+      // ── State ─────────────────────────────────────────────────────────────
+
+      const notes  = signal([
+        { id: 1, text: "Learn Vaniy signals",  done: true  },
+        { id: 2, text: "Try the html template", done: false },
+        { id: 3, text: "Ship something small",  done: false },
+      ]);
+      const draft  = signal("");
+      const filter = signal("all");
+
+      const visible = computed(() => {
+        const f = notes.val;
+        return filter.val === "done"   ? f.filter(n =>  n.done)
+             : filter.val === "active" ? f.filter(n => !n.done)
+             : f;
+      });
+      const totalCount = computed(() => notes.val.length);
+      const doneCount  = computed(() => notes.val.filter(n => n.done).length);
+
+      // ── Actions ───────────────────────────────────────────────────────────
+
+      const addNote = () => {
+        const text = draft.val.trim();
+        if (!text) return;
+        notes.val = [...notes.val, { id: Date.now(), text, done: false }];
+        draft.val = "";
+      };
+
+      const toggle = (id) =>
+        (notes.val = notes.val.map(n => n.id === id ? { ...n, done: !n.done } : n));
+
+      const remove = (id) =>
+        (notes.val = notes.val.filter(n => n.id !== id));
+
+      // ── html template: add form ───────────────────────────────────────────
+      //
+      // .value=${draft} — property binding keeps the input in sync with the signal.
+      // @input          — writes user input back into the signal (two-way).
+      // @keydown        — submits on Enter without a separate listener.
+
+      render(html`
+        <div class="add-form">
+          <input
+            .value=${draft}
+            @input=${(e) => (draft.val = e.target.value)}
+            @keydown=${(e) => e.key === "Enter" && addNote()}
+            placeholder="What needs doing?"
+          />
+          <button @click=${addNote}>Add</button>
+        </div>
+      `, "#form");
+
+      // ── html template: notes list ─────────────────────────────────────────
+      //
+      // The whole list re-renders whenever `visible` changes (filter or notes).
+      // Each item gets its own .checked and @change binding inside the template.
+
+      render(html`
+        <ul class="notes-list">
+          ${computed(() =>
+            visible.val.length
+              ? visible.val.map(note => html`
+                  <li class="note ${note.done ? "is-done" : ""}">
+                    <input
+                      type="checkbox"
+                      .checked=${note.done}
+                      @change=${() => toggle(note.id)}
+                    />
+                    <span class="note-text">${note.text}</span>
+                    <button class="del" @click=${() => remove(note.id)}>×</button>
+                  </li>
+                `)
+              : html`<li class="empty">Nothing here.</li>`
+          )}
+        </ul>
+      `, "#list");
+
+      // ── bind: stats ───────────────────────────────────────────────────────
+      //
+      // bindText targets specific text nodes; no template re-render needed.
+
+      bindText("#total-count", totalCount);
+      bindText("#done-count",  doneCount);
+
+      // ── bind: filter tabs ─────────────────────────────────────────────────
+      //
+      // bindClass toggles the active class on each tab button based on a
+      // computed that compares the current filter value.
+
+      bindClass("#btn-all",    "active", computed(() => filter.val === "all"));
+      bindClass("#btn-active", "active", computed(() => filter.val === "active"));
+      bindClass("#btn-done",   "active", computed(() => filter.val === "done"));
+
+      Q("#btn-all").on("click",    () => (filter.val = "all"));
+      Q("#btn-active").on("click", () => (filter.val = "active"));
+      Q("#btn-done").on("click",   () => (filter.val = "done"));
+
+      // ── bind: clear-done button ───────────────────────────────────────────
+      //
+      // bind("disabled") maps the signal directly to the disabled property.
+
+      bind("#clear-done", "disabled", computed(() => doneCount.val === 0));
+      Q("#clear-done").on("click", () => (notes.val = notes.val.filter(n => !n.done)));
+    </script>
+  </body>
+</html>

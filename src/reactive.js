@@ -28,7 +28,9 @@ export function signal(initial) {
 }
 
 export function effect(fn) {
+  let active = true;
   const run = () => {
+    if (!active) return;
     const prev = _tracking;
     _tracking = run;
     try {
@@ -38,7 +40,7 @@ export function effect(fn) {
     }
   };
   run();
-  return run;
+  return () => { active = false; };
 }
 
 export function computed(fn) {

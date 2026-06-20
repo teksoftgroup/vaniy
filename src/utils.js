@@ -126,3 +126,52 @@ export async function flow(initial, ...fns) {
 }
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+export const each =
+  (list, separator = "") =>
+  (template) =>
+    (list ?? []).map(template).join(separator);
+
+export const when = (condition, template) => (condition ? template : "");
+
+export const options = (list, valueKey, labelKey) =>
+  each(list)((i) => `<option value="${i[valueKey]}">${i[labelKey]}</option>`);
+
+// Select with a placeholder prepended
+export const select = (list, valueKey, labelKey, placeHolder = "Choose...") =>
+  `<option value="">${placeHolder}</option>` +
+  options(list, valueKey, labelKey);
+
+// radio group
+export const radios = (list, name) =>
+  each(list)(
+    (i) =>
+      `<label><input type="radio" name="${name}" value="${i.id}">${i.label}</label>`,
+  );
+
+// Table rows from an array of column keys
+export const rows = (list, keys) =>
+  each(list)((r) => `<tr>${each(keys)((k) => `<td>${r[k]}</td>`)}</tr>`);
+
+// Nested: optgroups, each with its own options
+export const optgroups = (groups) =>
+  each(groups)(
+    (g) =>
+      `<optgroup label="${g.label}">${options(g.items, "id", "name")}</optgroup>`,
+  );
+
+// Numbered list using the index arg
+export const ol = (list) =>
+  each(list, "\n")((item, idx) => `<li value="${idx + 1}">${item}</li>`);
+
+// Comma-separated text (sep isn't HTML-specific)
+export const csv = (list) => each(list, ", ")((i) => i.name);
+
+export const esc = (s) =>
+  String(s ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );

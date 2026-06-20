@@ -19,6 +19,16 @@ import {
   tryCatch,
   flow,
   sleep,
+  each,
+  when,
+  options,
+  select,
+  radios,
+  rows,
+  optgroups,
+  ol,
+  csv,
+  esc,
 } from "../src/utils.js";
 
 describe("utils.js", () => {
@@ -349,6 +359,189 @@ describe("utils.js", () => {
       vi.advanceTimersByTime(500);
       await p;
       expect(resolved).toBe(true);
+    });
+  });
+
+  describe("each()", () => {
+    it("maps a list through a template and joins with the given separator", () => {
+      const result = each([1, 2, 3], ",")((n) => `n${n}`);
+      expect(result).toBe("n1,n2,n3");
+    });
+
+    it("defaults to an empty separator", () => {
+      const result = each(["a", "b"])((s) => `[${s}]`);
+      expect(result).toBe("[a][b]");
+    });
+
+    it("treats null/undefined lists as empty", () => {
+      expect(each(null)((x) => x)).toBe("");
+      expect(each(undefined)((x) => x)).toBe("");
+    });
+  });
+
+  describe("when()", () => {
+    it("returns the template when condition is truthy", () => {
+      expect(when(true, "<span>shown</span>")).toBe("<span>shown</span>");
+      expect(when(1, "yes")).toBe("yes");
+    });
+
+    it("returns an empty string when condition is falsy", () => {
+      expect(when(false, "<span>hidden</span>")).toBe("");
+      expect(when(null, "yes")).toBe("");
+      expect(when(undefined, "yes")).toBe("");
+      expect(when(0, "yes")).toBe("");
+    });
+  });
+
+  describe("options()", () => {
+    it("renders an <option> tag per item using the given value/label keys", () => {
+      const list = [
+        { id: 1, name: "One" },
+        { id: 2, name: "Two" },
+      ];
+
+      const html = options(list, "id", "name");
+
+      expect(html).toBe(
+        '<option value="1">One</option><option value="2">Two</option>',
+      );
+    });
+
+    it("returns an empty string for an empty or missing list", () => {
+      expect(options([], "id", "name")).toBe("");
+      expect(options(null, "id", "name")).toBe("");
+    });
+  });
+
+  describe("select()", () => {
+    it("prepends a placeholder option before the mapped options", () => {
+      const list = [{ id: 1, name: "One" }];
+
+      const html = select(list, "id", "name");
+
+      expect(html).toBe(
+        '<option value="">Choose...</option><option value="1">One</option>',
+      );
+    });
+
+    it("uses a custom placeholder when provided", () => {
+      const html = select([], "id", "name", "Pick one");
+      expect(html).toBe('<option value="">Pick one</option>');
+    });
+  });
+
+  describe("radios()", () => {
+    it("renders a radio <label> per item sharing the given name", () => {
+      const list = [
+        { id: "a", label: "A" },
+        { id: "b", label: "B" },
+      ];
+
+      const html = radios(list, "letter");
+
+      expect(html).toBe(
+        '<label><input type="radio" name="letter" value="a">A</label>' +
+          '<label><input type="radio" name="letter" value="b">B</label>',
+      );
+    });
+
+    it("returns an empty string for an empty or missing list", () => {
+      expect(radios([], "letter")).toBe("");
+      expect(radios(null, "letter")).toBe("");
+    });
+  });
+
+  describe("rows()", () => {
+    it("renders a <tr> with a <td> per key for each item", () => {
+      const list = [
+        { id: 1, name: "Alice" },
+        { id: 2, name: "Bob" },
+      ];
+
+      const html = rows(list, ["id", "name"]);
+
+      expect(html).toBe(
+        "<tr><td>1</td><td>Alice</td></tr><tr><td>2</td><td>Bob</td></tr>",
+      );
+    });
+
+    it("returns an empty string for an empty or missing list", () => {
+      expect(rows([], ["id"])).toBe("");
+      expect(rows(null, ["id"])).toBe("");
+    });
+  });
+
+  describe("optgroups()", () => {
+    it("renders an <optgroup> per group with its own <option>s", () => {
+      const groups = [
+        {
+          label: "Fruits",
+          items: [{ id: 1, name: "Apple" }],
+        },
+        {
+          label: "Veggies",
+          items: [{ id: 2, name: "Carrot" }],
+        },
+      ];
+
+      const html = optgroups(groups);
+
+      expect(html).toBe(
+        '<optgroup label="Fruits"><option value="1">Apple</option></optgroup>' +
+          '<optgroup label="Veggies"><option value="2">Carrot</option></optgroup>',
+      );
+    });
+
+    it("returns an empty string for an empty or missing list of groups", () => {
+      expect(optgroups([])).toBe("");
+      expect(optgroups(null)).toBe("");
+    });
+  });
+
+  describe("ol()", () => {
+    it("renders a numbered <li> per item using the index", () => {
+      const html = ol(["First", "Second", "Third"]);
+
+      expect(html).toBe(
+        '<li value="1">First</li>\n<li value="2">Second</li>\n<li value="3">Third</li>',
+      );
+    });
+
+    it("returns an empty string for an empty or missing list", () => {
+      expect(ol([])).toBe("");
+      expect(ol(null)).toBe("");
+    });
+  });
+
+  describe("csv()", () => {
+    it("joins item names with a comma and space", () => {
+      const list = [{ name: "Alice" }, { name: "Bob" }, { name: "Carol" }];
+      expect(csv(list)).toBe("Alice, Bob, Carol");
+    });
+
+    it("returns an empty string for an empty or missing list", () => {
+      expect(csv([])).toBe("");
+      expect(csv(null)).toBe("");
+    });
+  });
+
+  describe("esc()", () => {
+    it("escapes HTML-significant characters", () => {
+      expect(esc(`<script>alert("x")</script>`)).toBe(
+        "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;",
+      );
+      expect(esc("Tom & Jerry's <tag>")).toBe(
+        "Tom &amp; Jerry&#39;s &lt;tag&gt;",
+      );
+    });
+
+    it("treats null/undefined as an empty string", () => {
+      expect(esc(null)).toBe("");
+      expect(esc(undefined)).toBe("");
+    });
+
+    it("passes through strings without special characters unchanged", () => {
+      expect(esc("plain text 123")).toBe("plain text 123");
     });
   });
 });

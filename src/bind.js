@@ -1,6 +1,7 @@
 "use strict";
 
 import { effect } from "./reactive.js";
+import { options, select } from "./utils.js";
 import { Q } from "./dom.js";
 
 function getElement(target) {
@@ -80,14 +81,8 @@ export function bindOptions(target, sig, opts = {}) {
 
   return effect(() => {
     const items = sig.val || [];
-    el.html(
-      `<option value="">${placeholder}</option>` +
-        items
-          .map(
-            (item) => `<option value="${item[value]}">${item[label]}</option>`,
-          )
-          .join(""),
-    );
+
+    el.html(select(items, value, label, placeholder));
   });
 }
 

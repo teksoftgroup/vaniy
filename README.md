@@ -925,6 +925,115 @@ const stop = client.bindQuery("users", fetcher, {
 
 Each event also fires as `query:<key>:<event>` for key-specific subscriptions.
 
+### Template Helpers
+
+Small composable functions for building HTML strings from data — useful inside `bindHtml`/`bindList` templates or anywhere you're hand-rolling markup.
+
+```javascript
+import { each, when, options, select, radios, rows, optgroups, ol, csv, esc } from "vaniy";
+```
+
+**`each(list, separator?)(template)`**
+
+Maps a list through a `template(item, index)` function and joins the results. `null`/`undefined` lists are treated as empty. This is the building block the other helpers below are made of.
+
+```javascript
+each([1, 2, 3], ",")((n) => `n${n}`); // "n1,n2,n3"
+each(["a", "b"])((s) => `[${s}]`); // "[a][b]"
+```
+
+**`when(condition, template)`**
+
+Returns `template` when `condition` is truthy, otherwise `""`. Handy for conditionally including a chunk of markup inline.
+
+```javascript
+`<ul>${when(items.length, "<li>Has items</li>")}</ul>`;
+```
+
+**`options(list, valueKey, labelKey)`**
+
+Renders an `<option>` per item.
+
+```javascript
+options(
+  [
+    { id: 1, name: "One" },
+    { id: 2, name: "Two" },
+  ],
+  "id",
+  "name",
+);
+// '<option value="1">One</option><option value="2">Two</option>'
+```
+
+**`select(list, valueKey, labelKey, placeholder?)`**
+
+Like `options`, with a placeholder `<option>` prepended. Used internally by `bindOptions`.
+
+```javascript
+select([{ id: 1, name: "One" }], "id", "name");
+// '<option value="">Choose...</option><option value="1">One</option>'
+```
+
+**`radios(list, name)`**
+
+Renders a radio-button `<label>` per item, sharing the same `name` attribute. Items are expected to have `id` and `label` properties.
+
+```javascript
+radios(
+  [
+    { id: "a", label: "A" },
+    { id: "b", label: "B" },
+  ],
+  "letter",
+);
+// '<label><input type="radio" name="letter" value="a">A</label><label><input type="radio" name="letter" value="b">B</label>'
+```
+
+**`rows(list, keys)`**
+
+Renders a `<tr>` per item with a `<td>` for each key in `keys`.
+
+```javascript
+rows([{ id: 1, name: "Alice" }], ["id", "name"]);
+// "<tr><td>1</td><td>Alice</td></tr>"
+```
+
+**`optgroups(groups)`**
+
+Renders an `<optgroup>` per group, with each group's `items` rendered as `<option>`s via `options`. Groups are expected to have `label` and `items` properties.
+
+```javascript
+optgroups([{ label: "Fruits", items: [{ id: 1, name: "Apple" }] }]);
+// '<optgroup label="Fruits"><option value="1">Apple</option></optgroup>'
+```
+
+**`ol(list)`**
+
+Renders a numbered `<li value="...">` per item, joined with newlines.
+
+```javascript
+ol(["First", "Second"]);
+// '<li value="1">First</li>\n<li value="2">Second</li>'
+```
+
+**`csv(list)`**
+
+Joins each item's `name` property with `", "`.
+
+```javascript
+csv([{ name: "Alice" }, { name: "Bob" }]); // "Alice, Bob"
+```
+
+**`esc(value)`**
+
+Escapes `& < > " '` for safe interpolation into HTML. Use it to sanitize untrusted strings before they go into any of the template helpers above.
+
+```javascript
+esc(`<script>alert("x")</script>`);
+// "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;"
+```
+
 ### Utilities
 
 Additional helper functions.

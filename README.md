@@ -7,6 +7,7 @@ Vaniy is how we say vanilla in my language.
 
 - **DOM Manipulation** - jQuery-like chainable API for element selection and manipulation
 - **HTTP Client** - Full-featured HTTP client with caching, interceptors, and file upload/download
+- **WebSocket** - Session tracking, rooms, auto-reconnect, and request/response (RPC) over WebSocket
 - **Event System** - Pub/Sub event emitter for decoupled communication
 - **Form Handling** - Validation engine with error rendering
 - **Reactivity** - Fine-grained signals, effects, computed values, and batching
@@ -165,6 +166,49 @@ await HTTP.download("/files/doc.pdf", {
   },
 });
 ```
+
+### WebSocket
+
+WebSocket client with session tracking, rooms, auto-reconnect, and an RPC-style request/response pattern.
+
+```javascript
+import { WS, createSocket } from "vaniy";
+
+// Default singleton - connect() is chainable, listeners can be registered before connecting
+WS.connect("wss://api.example.com/socket")
+  .onOpen(() => console.log("connected, session:", WS.session()))
+  .onClose(() => console.log("disconnected"))
+  .onReconnect((attempt) => console.log("reconnecting, attempt", attempt));
+
+// Join a room and listen for events scoped to it
+WS.join("room-1");
+WS.on("chat", (msg) => console.log("chat:", msg), { room: "room-1" });
+
+// Send a structured event ({ type: "event", event, payload, room })
+WS.emit("chat", { text: "hi" }, { room: "room-1" });
+
+// Request/response (RPC) with timeout - resolves on a matching
+// { type: "response", id, payload } message from the server
+const me = await WS.request("whoami");
+
+// Independent connections (e.g. a second socket alongside the default one)
+const notifications = createSocket("wss://api.example.com/notifications", {
+  heartbeat: { interval: 30000, timeout: 5000 },
+});
+notifications.on("alert", (payload) => console.log(payload));
+```
+
+**Built-in lifecycle events:** `open`, `close`, `error`, `reconnect`, `reconnect_failed`, `message` (every inbound frame, raw or parsed), `session` (fires when the session id is set/updated).
+
+**Wire protocol** (JSON envelopes; plain text/binary frames still surface via the `message` event):
+
+| Direction       | Shape                                          |
+| --------------- | ----------------------------------------------- |
+| client -> server | `{ type: "event", event, payload, room? }`     |
+| client -> server | `{ type: "request", event, payload, id, room? }` |
+| server -> client | `{ type: "response", id, payload, error? }`    |
+| server -> client | `{ type: "session", id }`                       |
+| client -> server | `{ type: "join" \| "leave", room }`             |
 
 ### Events
 

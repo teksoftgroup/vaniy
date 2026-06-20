@@ -2,6 +2,7 @@ import EVT from "./evt.js";
 import V from "./validator.js";
 import DOM from "./dom.js";
 import HTTP from "./http.js";
+import WS, { createSocket } from "./ws.js";
 import {
   bind,
   bindText,
@@ -27,7 +28,18 @@ import {
   onPageLoad,
   onWindowLoad,
 } from "./dom.js";
-import { get, post, put, del, raw, upload, download, request } from "./http.js";
+import {
+  get,
+  post,
+  put,
+  patch,
+  del,
+  options,
+  raw,
+  upload,
+  download,
+  request,
+} from "./http.js";
 import {
   redirect,
   isArray,
@@ -43,8 +55,9 @@ import { signal, effect, computed, batch, when } from "./reactive.js";
 import { tag, createPresets } from "./ui.js";
 import { mount } from "./component.js";
 
-export { EVT, V, DOM, HTTP };
-export { get, post, put, del, raw, upload, download, request };
+export { EVT, V, DOM, HTTP, WS };
+export { createSocket };
+export { get, post, put, patch, del, options, raw, upload, download, request };
 export { useFormHandler, FormHandler, FormErrorRenderer, FormEvents };
 export { Q, all, make, makeId, parseHtml, onPageLoad, onWindowLoad };
 export {

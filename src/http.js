@@ -539,14 +539,19 @@ export function upload(
  * - get(url, opts)
  * - post(url, body, opts)
  * - put(url, body, opts)
+ * - patch(url, body, opts)
  * - delete(url, opts)
+ * - options(url, opts)
  */
 export const get = (url, opts) => request("GET", url, opts);
 export const post = (url, body, opts = {}) =>
   request("POST", url, { ...opts, body });
 export const put = (url, body, opts = {}) =>
   request("PUT", url, { ...opts, body });
+export const patch = (url, body, opts = {}) =>
+  request("PATCH", url, { ...opts, body });
 export const del = (url, opts = {}) => request("DELETE", url, opts);
+export const options = (url, opts = {}) => request("OPTIONS", url, opts);
 export const raw = (url, opts) => fetch(_base + url, opts);
 
 const HTTP = {
@@ -634,7 +639,9 @@ const HTTP = {
   get,
   post,
   put,
+  patch,
   delete: del,
+  options,
   raw,
   download,
   upload,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import HTTP, { request, get, post, put, del } from "../src/http.js";
+import HTTP, { request, get, post, put, patch, del, options } from "../src/http.js";
 
 function makeFetchResponse({
   ok = true,
@@ -942,6 +942,16 @@ describe("http.js", () => {
       expect(cfg.body).toBe(JSON.stringify({ id: 1 }));
     });
 
+    it("patch() calls request with PATCH method and body", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { ok: true } }),
+      );
+      await patch("/test", { id: 1 });
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.method).toBe("PATCH");
+      expect(cfg.body).toBe(JSON.stringify({ id: 1 }));
+    });
+
     it("del() calls request with DELETE method", async () => {
       global.fetch.mockResolvedValue(
         makeFetchResponse({ ok: true, status: 200, jsonData: { ok: true } }),
@@ -949,6 +959,15 @@ describe("http.js", () => {
       await del("/test");
       const [, cfg] = global.fetch.mock.calls[0];
       expect(cfg.method).toBe("DELETE");
+    });
+
+    it("options() calls request with OPTIONS method", async () => {
+      global.fetch.mockResolvedValue(
+        makeFetchResponse({ ok: true, status: 200, jsonData: { ok: true } }),
+      );
+      await options("/test");
+      const [, cfg] = global.fetch.mock.calls[0];
+      expect(cfg.method).toBe("OPTIONS");
     });
   });
 });
